@@ -18,7 +18,7 @@
 
 6. Installera VSCode, med [Remote - SSH Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) extension.
 
-7. Logga in i Chalmers kluster via Remote SSH i VSCode, med CID@minerva.cse.chalmers.se och ditt eget CID-lösenord (obs. välj Linux oavsett eget operativsystem, då klustret använder det)
+7. Logga in i Chalmers kluster via "Remote-SSH: Connect to host..." i sökfältet i VSCode, med CID@minerva.cse.chalmers.se och ditt eget CID-lösenord (obs. välj Linux oavsett eget operativsystem, då klustret använder det)
 
 8. Inne i klustret (VSCode öppnar nytt fönster, ljusblå bar i nedre vänstra hörnet) skapar du en fil som heter något i stil med **my-script.sh** som innehåller: 
 
@@ -33,8 +33,11 @@ source /path/to/your/.venv/bin/activate
 python3 namn-på-programfil.py 
 ```
 
-med placeholders utbytta mot verkliga namn. **OBS** Använd #SBATCH --gres=gpu för att köra på GPU om det verkligen behövs. 
+med placeholders utbytta mot verkliga namn. 
 
-9. Du bör nu kunna köra din batch-fil med ```sbatch my-script.sh``` och få all output till en fil i stil med ```slurm-117668.out```
+**OBS** Använd #SBATCH --gres=gpu för att köra på GPU om det verkligen behövs. 
 
+9. Gå in i ditt venv (nu i VSCode:s terminal) med ```source .venv/bin/activate```
+
+10. Du bör nu kunna köra din batch-fil (som i sin tur kör python-filen) via terminalen i VSCode med ```sbatch my-script.sh``` och få all output till en fil i stil med ```slurm-117668.out```
 
