@@ -10,11 +10,11 @@
 
 2. Input ```ssh CID@minerva.cse.chalmers.se ``` och ditt CID-lösenord i terminalen för att aktivera tillgång. 
 
-3. Gå till ditt valda directory och skapa en mapp för virtual environment med ```python3 -m venv .venv```. 
+3. Gå till ett lämpligt directory (ex. "kandidatarbete") och skapa en mapp för virtual environment med ```python3 -m venv .venv```. 
 
 4. Gå in i ditt venv. med ```source .venv/bin/activate```, nu borde ```(.venv)``` stå till vänster i din terminal. 
  
-5. Installera alla packages som projektet behöver med pip, ex. ```pip install numpy```, dessa hamnar nu i venv och kan återanvändas lätt vid framtida körningar. 
+5. Installera alla packages som projektet behöver med pip, ex. ```pip install numpy```, dessa hamnar nu i venv-mappen och kan återanvändas lätt vid framtida körningar. 
 
 6. Installera VSCode, med [Remote - SSH Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) extension.
 
