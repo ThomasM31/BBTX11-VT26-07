@@ -6,21 +6,23 @@
 **OBS** Bara tillgängligt från Chalmers nätverk (om man inte använder VPN)
 
 ## Innan man kan använda det
-1. Ansök om access till Chalmers Minerva cluster [here](https://forms.office.com/e/NLe5HDPGKY). Det tar vanligtvis några dagar att få svar. 
+1. Ansök om access till Chalmers Minerva cluster [here](https://forms.office.com/e/NLe5HDPGKY). Det tar vanligtvis några dagar att få svar.
 
-2. Input ```ssh CID@minerva.cse.chalmers.se ``` och ditt CID-lösenord i terminalen för att aktivera tillgång. 
+2. Om du inte är på plats på Chalmers och använder Eduroam: Anslut till Chalmers VPN. 
 
-3. Gå till ett lämpligt directory (ex. "kandidatarbete") och skapa en mapp för virtual environment med ```python3 -m venv .venv```. 
+3. Input ```ssh CID@minerva.cse.chalmers.se ``` och ditt CID-lösenord i terminalen för att aktivera tillgång. 
 
-4. Gå in i ditt venv. med ```source .venv/bin/activate```, nu borde ```(.venv)``` stå till vänster i din terminal. 
+4. Gå till ett lämpligt directory (ex. "kandidatarbete") och skapa en mapp för virtual environment med ```python3 -m venv .venv```. 
+
+5. Gå in i ditt venv. med ```source .venv/bin/activate```, nu borde ```(.venv)``` stå till vänster i din terminal. 
  
-5. Installera alla packages som projektet behöver med pip, ex. ```pip install numpy```, dessa hamnar nu i venv-mappen och kan återanvändas lätt vid framtida körningar. 
+6. Installera alla packages som projektet behöver med pip, ex. ```pip install numpy```, dessa hamnar nu i venv-mappen och kan återanvändas lätt vid framtida körningar. 
 
-6. Installera VSCode, med [Remote - SSH Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) extension.
+7. Installera VSCode, med [Remote - SSH Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) extension.
 
-7. Logga in i Chalmers kluster via "Remote-SSH: Connect to host..." i sökfältet i VSCode, med CID@minerva.cse.chalmers.se och ditt eget CID-lösenord (obs. välj Linux oavsett eget operativsystem, då klustret använder det)
+8. Logga in i Chalmers kluster via "Remote-SSH: Connect to host..." i sökfältet i VSCode, med CID@minerva.cse.chalmers.se och ditt eget CID-lösenord (obs. välj Linux oavsett eget operativsystem, då klustret använder det)
 
-8. Inne i klustret (VSCode öppnar nytt fönster, ljusblå bar i nedre vänstra hörnet) skapar du en fil som heter något i stil med **my-script.sh** som innehåller: 
+9. Inne i klustret (VSCode öppnar nytt fönster, ljusblå bar i nedre vänstra hörnet) skapar du en fil som heter något i stil med **my-script.sh** som innehåller: 
 
 ```
 #! /bin/bash
