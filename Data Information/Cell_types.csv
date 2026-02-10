@@ -1,55 +1,55 @@
-cell_type_high_resolution,major_cell_type
-Exc L2-3 CBLN2 LINC02306,Exc
-Exc L3-4 RORB CUX2,Exc
-Exc L3-5 RORB PLCH1,Exc
-Exc L4-5 RORB IL1RAPL2,Exc
-Exc L4-5 RORB GABRG1,Exc
-Exc L5-6 RORB LINC02196,Exc
-Exc L6 THEMIS NFIA,Exc
-Exc L5/6 IT Car3,Exc
-Exc L5 ET,Exc
-Exc L5/6 NP,Exc
-Exc L6 CT,Exc
-Exc L6b,Exc
-Exc RELN CHD7,Exc
-Exc NRGN,Exc
-Inh L1-6 LAMP5 CA13,Inh
-Inh LAMP5 NRG1 (Rosehip),Inh
-Inh LAMP5 RELN,Inh
-Inh L1 PAX6 CA4,Inh
-Inh L1-2 PAX6 SCGN,Inh
-Inh VIP ABI3BP,Inh
-Inh SORCS1 TTN,Inh
-Inh VIP TSHZ2,Inh
-Inh RYR3 TSHZ2,Inh
-Inh VIP THSD7B,Inh
-Inh SGCD PDE3A,Inh
-Inh ALCAM TRPM3,Inh
-Inh PTPRK FAM19A1,Inh
-Inh VIP CLSTN2,Inh
-Inh GPC5 RIT2,Inh
-Inh L5-6 PVALB STON2,Inh
-Inh PVALB SULF1,Inh
-Inh PVALB CA8 (Chandelier),Inh
-Inh PVALB HTR4,Inh
-Inh CUX2 MSR1,Inh
-Inh FBN2 EPB41L4A,Inh
-Inh L5-6 SST TH,Inh
-Inh ENOX2 SPHKAP,Inh
-Inh L3-5 SST MAFB,Inh
-Inh L6 SST NPY,Inh
-Ast GRM3,Ast
-Ast DPP10,Ast
-Ast CHI3L1,Ast
-Oli,Oli
-OPC,OPC
-Mic P2RY12,Mic
-Mic MKI67,Mic
-Mic TPT1,Mic
-CAMs,CAMs
-T cells,T cells
-End,End
-Per,Per
-SMC,SMC
-Fib FLRT2,Fib
-Fib SLC4A4,Fib
+cell_type_high_resolution , major_cell_type
+Exc L2-3 CBLN2 LINC02306  , Exc
+Exc L3-4 RORB CUX2        , Exc
+Exc L3-5 RORB PLCH1       , Exc
+Exc L4-5 RORB IL1RAPL2    , Exc
+Exc L4-5 RORB GABRG1      , Exc
+Exc L5-6 RORB LINC02196   , Exc
+Exc L6 THEMIS NFIA        , Exc
+Exc L5/6 IT Car3          , Exc
+Exc L5 ET                 , Exc
+Exc L5/6 NP               , Exc
+Exc L6 CT                 , Exc
+Exc L6b                   , Exc
+Exc RELN CHD7             , Exc
+Exc NRGN                  , Exc
+Inh L1-6 LAMP5 CA13       , Inh
+Inh LAMP5 NRG1 (Rosehip)  , Inh
+Inh LAMP5 RELN            , Inh
+Inh L1 PAX6 CA4           , Inh
+Inh L1-2 PAX6 SCGN        , Inh
+Inh VIP ABI3BP            , Inh
+Inh SORCS1 TTN            , Inh
+Inh VIP TSHZ2             , Inh
+Inh RYR3 TSHZ2            , Inh
+Inh VIP THSD7B            , Inh
+Inh SGCD PDE3A            , Inh
+Inh ALCAM TRPM3           , Inh
+Inh PTPRK FAM19A1         , Inh
+Inh VIP CLSTN2            , Inh
+Inh GPC5 RIT2             , Inh
+Inh L5-6 PVALB STON2      , Inh
+Inh PVALB SULF1           , Inh
+Inh PVALB CA8 (Chandelier), Inh
+Inh PVALB HTR4            , Inh
+Inh CUX2 MSR1             , Inh
+Inh FBN2 EPB41L4A         , Inh
+Inh L5-6 SST TH           , Inh
+Inh ENOX2 SPHKAP          , Inh
+Inh L3-5 SST MAFB         , Inh
+Inh L6 SST NPY            , Inh
+Ast GRM3                  , Ast
+Ast DPP10                 , Ast
+Ast CHI3L1                , Ast
+Oli                       , Oli
+OPC                       , OPC
+Mic P2RY12                , Mic
+Mic MKI67                 , Mic
+Mic TPT1                  , Mic
+CAMs                      , CAMs
+T cells                   , T cells
+End                       , End
+Per                       , Per
+SMC                       , SMC
+Fib FLRT2                 , Fib
+Fib SLC4A4                , Fib
