@@ -1,3 +1,4 @@
+scanpy
 numpy
 pandas
 matplotlib
@@ -6,4 +7,3 @@ torchvision
 torchmetrics
 scikit-learn
 shap
-scanpy
