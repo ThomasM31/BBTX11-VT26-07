@@ -1,5 +1,5 @@
 import scanpy as sc
-import anndata as ad
+#import anndata as ad
 
-#print(ad.__version__)
+print(sc.__file__)
 #adata = sc.read_h5ad("df2.h5ad")
