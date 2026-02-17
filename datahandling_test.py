@@ -13,6 +13,16 @@ from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from anndata.experimental.pytorch import AnnLoader
 from anndata.experimental import AnnCollection
 
+import warnings
+warnings.filterwarnings("ignore")
+
+def version_prints():
+    print(f"Anndata version: {ad.__version__}")
+    print(f"Pytorch version: {torch.__version__}")
+    print(f"CUDA available: {torch.cuda.is_available()}")
+
+version_prints()
+
 #print(sc.__version__)
 vasc_path = "Vasculature_cells.h5ad"
 
@@ -94,7 +104,7 @@ def read_in_backed(path):
     print(f"Backed mode: {adata_backed.isbacked}")
     return adata_backed
 
-adata_backed = read_in_backed(path=vasc_path)
+#adata_backed = read_in_backed(path=vasc_path)
 ## NOTE: Close adata_backed when done!!
-adata_backed.file.close()
+#adata_backed.file.close()
 
