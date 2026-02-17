@@ -58,4 +58,10 @@ def show_data(adata):
 
 #show_data(adata=adata)
 
-print(adata.varm)
+def check_sparsity(adata):
+    print(f"Sparse AnnData: {adata.n_obs} n_obs x {adata.n_vars} n_vars")
+    sparsity = 1 - adata.X.nnz / (adata.n_obs * adata.n_vars)
+    print(f"Sparsity: {sparsity:.2%}")
+    return sparsity
+
+sparsity = check_sparsity(adata)
