@@ -1,7 +1,17 @@
-import scanpy as sc, anndata as ad
+# Data handling
+import scanpy as sc
+import anndata as ad
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, csc_matrix
+
+# Deep Learning
+import torch 
+import torch.nn as nn
+from torch.utils.data import WeightedRandomSampler
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from anndata.experimental.pytorch import AnnLoader
+from anndata.experimental import AnnCollection
 
 #print(sc.__version__)
 vasc_path = "Vasculature_cells.h5ad"
@@ -85,3 +95,6 @@ def read_in_backed(path):
     return adata_backed
 
 adata_backed = read_in_backed(path=vasc_path)
+## NOTE: Close adata_backed when done!!
+adata_backed.file.close()
+
