@@ -1,9 +1,10 @@
-import scanpy as sc
+import scanpy as sc, anndata as ad
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, csc_matrix
 
 #print(sc.__version__)
+vasc_path = "Vasculature_cells.h5ad"
 
 def check_ok(f):
     # ensure that the file was properly saved
@@ -11,7 +12,7 @@ def check_ok(f):
     print(f"Successfully read and saved {test_load.n_obs} cells")
     return test_load
 
-adata = check_ok("Vasculature_cells.h5ad")
+adata = check_ok(vasc_path)
 
 def show_data(adata):
     print(adata)
@@ -42,7 +43,7 @@ def show_data(adata):
     print(adata.var.head())
 
     # List the names of all available reductions
-    print("\n + av. reductions:")
+    print("\n + available reductions:")
     print(adata.obsm.keys())
 
     # View the actual UMAP coordinates
@@ -56,7 +57,6 @@ def show_data(adata):
     print("\n + plotting umap:")
     sc.pl.umap(adata, color='ident', frameon=False, title="Imported Seurat Clusters")
 
-#show_data(adata=adata)
 
 def check_sparsity(adata):
     print(f"Sparse AnnData: {adata.n_obs} n_obs x {adata.n_vars} n_vars")
@@ -64,4 +64,24 @@ def check_sparsity(adata):
     print(f"Sparsity: {sparsity:.2%}")
     return sparsity
 
-sparsity = check_sparsity(adata)
+#sparsity = check_sparsity(adata)
+
+def create_layers(adata):
+    adata.layers["raw"] = adata.X.copy()
+    print(f"Available layers: {list(adata.layers.keys())}")
+
+    return adata
+
+#create_layers(adata)
+#show_data(adata)
+
+# BACKED MODE
+def read_in_backed(path):
+    adata_backed = sc.read_h5ad(path, backed="r")   
+
+    assert adata_backed.isbacked, "Should be in backed mode"
+
+    print(f"Backed mode: {adata_backed.isbacked}")
+    return adata_backed
+
+adata_backed = read_in_backed(path=vasc_path)
