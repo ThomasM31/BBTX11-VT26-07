@@ -21,7 +21,7 @@ def version_prints():
     print(f"Pytorch version: {torch.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
 
-version_prints()
+#version_prints()
 
 #print(sc.__version__)
 vasc_path = "Vasculature_cells.h5ad"
@@ -108,3 +108,4 @@ def read_in_backed(path):
 ## NOTE: Close adata_backed when done!!
 #adata_backed.file.close()
 
+print(adata)
