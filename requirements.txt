@@ -1,4 +1,5 @@
 scanpy
+anndata
 numpy
 pandas
 matplotlib
@@ -6,4 +7,7 @@ torch
 torchvision
 torchmetrics
 scikit-learn
+scipy
 shap
+os
+warnings
