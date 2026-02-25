@@ -251,6 +251,9 @@ def pipeline():
 
     draw_umaps(datasets, included_labels)
 
+    # TODO add encodings, converters, anndata collection, train-test split etc from pipeline_test, 
+    # maybe in a separate file and read from saved pseudo data?
+
     print('Pipeline completed')
 
 
