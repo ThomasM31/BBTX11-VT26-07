@@ -22,7 +22,6 @@ def read_files(to_include: list) -> dict:
     filepath = str(base_path)
 
     labels = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
-    to_include = [8]
 
     included_labels = [labels[i] for i in to_include]
     print(f'Labels to include: {included_labels}')
@@ -139,20 +138,19 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "to_include",
-        help="list of indices to include: \n0=astro \n1=exc1 \n2=exc2 \n3=exc3 \n4=immune \n5=inhi \n6=oligo \n7=opcs \n8=vasc",
-        type=list
-    )
-
-    parser.add_argument(
         "train_size",
         help="float with min:0.0, max:1.0, default=0.8",
         type=range_limited_float_type,
         default=0.8
     )
 
+    parser.add_argument(
+        "to_include",
+        help="indices to include: \n0=astro \n1=exc1 \n2=exc2 \n3=exc3 \n4=immune \n5=inhi \n6=oligo \n7=opcs \n8=vasc",
+        nargs='+'
+    )
+    
     args = parser.parse_args()
 
-    train_adata, test_adata = pipeline(args.to_include, args.train_size)
-
-    return train_adata, test_adata
+    to_include = [int(arg) for arg in args.to_include]
+    train_adata, test_adata = pipeline(to_include, args.train_size)
