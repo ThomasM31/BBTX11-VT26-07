@@ -1,30 +1,31 @@
 import os
-import torch
-from torch import nn
-import torch.distributed as dist
-from torch.utils.data import WeightedRandomSampler
-import torch.optim as optim
+from pathlib import Path
+import argparse
 
 import scanpy as sc
-
 import pandas as pd
 import numpy as np
-
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder
-from sklearn.model_selection import train_test_split
 
 import anndata as ad
 from anndata.experimental import AnnCollection
 from anndata.experimental.pytorch import AnnLoader
 ad.settings.allow_write_nullable_strings = True
 
-import matplotlib.pyplot as plt
-import seaborn as sns
+def get_labels(to_include: list) -> list:
+    labels = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
+    included_labels = [labels[i] for i in to_include]
+    print(f'Labels to include: {included_labels}')
 
-from pathlib import Path
+    return included_labels
 
+def read_files(filepath: str, included_labels: list) -> dict:
+    # inner dict holds the original data, hvg subset, and pseudobatched data
+    # keeping all of them helps us compare them later to see the effects of pre-processing
+    datasets = {
+        label: {'orig': None, 'subset': None, 'pseudo': None} 
+        for label in included_labels
+    }
 
-def read_files(datasets: dict, filepath: str, included_labels: list):
     files = {'astro'  : 'Astrocytes.h5ad',
              'exc1'   : 'Excitatory_neurons_set1.h5ad',
              'exc2'   : 'Excitatory_neurons_set2.h5ad',
@@ -42,6 +43,8 @@ def read_files(datasets: dict, filepath: str, included_labels: list):
         print(f'Reading: {label}')
         f = os.path.join(p,files[label])
         datasets[label]['orig'] = ad.read_h5ad(f)
+
+    return datasets
 
 
 def prep_for_hvg_sel(datasets: dict, included_labels: list):
@@ -143,9 +146,9 @@ def draw_umaps(datasets: dict, included_labels: list):
         adata_proc = datasets[label]['pseudo']
         print(f'Drawing umaps for {label}')
         
-        fname1 = f'_{label}_orig'
+        fname1 = f'{label}_orig'
         fname1 = os.path.join(fig_path,fname1)
-        fname2 = f'_{label}_proc'
+        fname2 = f'{label}_proc'
         fname2 = os.path.join(fig_path,fname2)
 
         # UMAP for original
@@ -213,29 +216,15 @@ def save_files(datasets: dict, filepath: str, included_labels: list):
     print('Writing to file(s) completed')
 
 
-def pipeline():
+def pipeline(to_include: list):
     ### To read from and write to current users folders
     user = os.environ.get('USER') or os.environ.get('USERNAME')
     base_path = Path("/data/users") / user / "kand/data/"
     filepath = str(base_path)
 
-    labels = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
-    
-    #to_include = list(range(0,3))
-    to_include = [8]
-    print(f'Indexes to include: {to_include}')
-    
-    included_labels = [labels[i] for i in to_include]
-    print(f'Labels to include: {included_labels}')
+    included_labels = get_labels(to_include)
 
-    # inner dict holds the original data, hvg subset, and pseudobatched data
-    # keeping all of them helps us compare them later to see the effects of pre-processing
-    datasets = {
-        label: {'orig': None, 'subset': None, 'pseudo': None} 
-        for label in labels
-    }
-
-    read_files(datasets, filepath, included_labels)
+    datasets = read_files(filepath, included_labels)
 
     prep_for_hvg_sel(datasets, included_labels)
 
@@ -251,10 +240,20 @@ def pipeline():
 
     draw_umaps(datasets, included_labels)
 
-    # TODO add encodings, converters, anndata collection, train-test split etc from pipeline_test, 
-    # maybe in a separate file and read from saved pseudo data?
-
     print('Pipeline completed')
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description = "Pre-process anndata objects and save as .h5ad"
+    )
 
-pipeline()
+    parser.add_argument(
+        "to_include",
+        help="indices to include: \n0=astro \n1=exc1 \n2=exc2 \n3=exc3 \n4=immune \n5=inhi \n6=oligo \n7=opcs \n8=vasc",
+        nargs='+')
+
+    args = parser.parse_args()
+    to_include = [int(arg) for arg in args.to_include]
+
+    pipeline(to_include)
+
