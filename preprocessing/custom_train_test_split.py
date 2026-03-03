@@ -15,7 +15,7 @@ from anndata.experimental import AnnCollection
 from anndata.experimental.pytorch import AnnLoader
 ad.settings.allow_write_nullable_strings = True
 
-def read_files(to_include: list) -> dict:
+def read_files(to_include: list[int]) -> dict:
     ### To read from current user's folders
     user = os.environ.get('USER') or os.environ.get('USERNAME')
     base_path = Path("/data/users") / user / "kand/data/processed_data/"
@@ -108,7 +108,7 @@ def custom_train_test_split(collection: AnnCollection, train_size: float):
     return train_adata, test_adata
 
 
-def pipeline(to_include: list, train_size: float):
+def pipeline(to_include: list[int], train_size: float):
     '''Prepare train-test split from preprocessed .h5ad files'''
     datasets = read_files(to_include)
     
@@ -147,7 +147,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "to_include",
         help="indices to include: \n0=astro \n1=exc1 \n2=exc2 \n3=exc3 \n4=immune \n5=inhi \n6=oligo \n7=opcs \n8=vasc",
-        nargs='+'
+        nargs='+',
+        type=int
     )
     
     args = parser.parse_args()
