@@ -18,13 +18,16 @@ def get_labels(to_include: list) -> list:
 
     return included_labels
 
-def read_files(filepath: str, included_labels: list) -> dict:
+def get_datasets(included_labels: list) -> dict:
     # inner dict holds the original data, hvg subset, and pseudobatched data
     # keeping all of them helps us compare them later to see the effects of pre-processing
     datasets = {
         label: {'orig': None, 'subset': None, 'pseudo': None} 
         for label in included_labels
     }
+    return datasets
+
+def read_files(filepath: str, datasets: dict) -> None:
 
     files = {'astro'  : 'Astrocytes.h5ad',
              'exc1'   : 'Excitatory_neurons_set1.h5ad',
@@ -39,7 +42,7 @@ def read_files(filepath: str, included_labels: list) -> dict:
     p = 'conv_data'
     p = os.path.join(filepath, p)
 
-    for label in included_labels:
+    for label in list(datasets.keys()):
         print(f'Reading: {label}')
         f = os.path.join(p,files[label])
         datasets[label]['orig'] = ad.read_h5ad(f)
@@ -47,8 +50,8 @@ def read_files(filepath: str, included_labels: list) -> dict:
     return datasets
 
 
-def prep_for_hvg_sel(datasets: dict, included_labels: list):
-    for label in included_labels:
+def prep_for_hvg_sel(datasets: dict) -> None:
+    for label in list(datasets.keys()):
         dataset = datasets.get(label)['orig']
         # need to log normalize, some datasets seem to not be properly normalized in the logcounts layer
         # if we just use the logcounts layer it causes crashes when extracting HVGs
@@ -64,12 +67,12 @@ def prep_for_hvg_sel(datasets: dict, included_labels: list):
         print(f'min after: {dataset_log.X.min()}, max after: {dataset_log.X.max():.1f}')
 
 
-def extract_common_hvgs(datasets: dict, included_labels: list, n_top_genes: int = 2000):
+def extract_common_hvgs(datasets: dict, n_top_genes: int = 2000) -> None:
     # Keep only highly variable genes (HVGs)
     hvgs = []
 
     # extract HVGs (NOTE: expects normalized data)
-    for label in included_labels:
+    for label in list(datasets.keys()):
         print(f'Extracting HVGS from "{label}"')
 
         # use log1p layer
@@ -88,16 +91,16 @@ def extract_common_hvgs(datasets: dict, included_labels: list, n_top_genes: int 
     print(f'Nr common hvgs: {len(common_hvgs)}')
 
     # keep only HVGs
-    for label in included_labels:
+    for label in list(datasets.keys()):
         datasets[label]['subset'] = datasets[label]['orig'][:, common_hvgs].copy()
         print(f'HVGs for {label}')
         print(datasets[label]['subset'])
 
 
-def pseudobulk(datasets: dict, included_labels: list):
+def pseudobulk(datasets: dict) -> None:
     # Perform pseudobulk by test subject and high res celltype
 
-    for label in included_labels:
+    for label in list(datasets.keys()):
         print(f'Pseudobulking "{label}"')
 
         pseudo = sc.get.aggregate(
@@ -111,8 +114,8 @@ def pseudobulk(datasets: dict, included_labels: list):
         datasets[label]['pseudo'] = pseudo
 
 
-def normalize(datasets: dict, included_labels: list):
-    for label in included_labels:
+def normalize(datasets: dict) -> None:
+    for label in list(datasets.keys()):
         print(f'Normalizing: "{label}"')
         
         adata = datasets[label]['pseudo']
@@ -134,14 +137,14 @@ def normalize(datasets: dict, included_labels: list):
         print(f'{label:<8} has min: {adata.X.min():.2f} and max: {adata.X.max():.2f}')
 
 
-def draw_umaps(datasets: dict, included_labels: list):
+def draw_umaps(datasets: dict) -> None:
     user = os.environ.get('USER') or os.environ.get('USERNAME')
     fig_path = Path("/data/users") / user / "kand/data/figures/"
     # create the path if it doesn't exist
     fig_path.mkdir(parents=True, exist_ok=True)
     fig_path = str(fig_path)
     
-    for label in included_labels:
+    for label in list(datasets.keys()):
         adata = datasets[label]['orig']
         adata_proc = datasets[label]['pseudo']
         print(f'Drawing umaps for {label}')
@@ -172,7 +175,7 @@ def draw_umaps(datasets: dict, included_labels: list):
         print("Drawing completed")
 
 
-def add_metadata(datasets: dict, filepath: str, included_labels: list, is_float=True):
+def add_metadata(datasets: dict, filepath: str, is_float=True) -> None:
     # Add subject disease status metadata
     directory = 'supplementary_data/'
     file = 'individual_metadata_deidentified.tsv'
@@ -195,7 +198,7 @@ def add_metadata(datasets: dict, filepath: str, included_labels: list, is_float=
     # create map with subject as key, AD status as value
     status_map = dict(zip(md_sel['subject'], md_sel[AD_status_lbl]))
 
-    for label in included_labels:
+    for label in list(datasets.keys()):
         pseudo = datasets[label]['pseudo']
         subjects = pseudo.obs['subject'].astype(str).values
 
@@ -203,9 +206,9 @@ def add_metadata(datasets: dict, filepath: str, included_labels: list, is_float=
         pseudo.obs['AD_status'] = pseudo.obs['AD_status'].astype('category')
 
 
-def save_files(datasets: dict, filepath: str, included_labels: list):
+def save_files(datasets: dict, filepath: str) -> None:
     # Save pseudobatched data
-    for label in included_labels:
+    for label in list(datasets.keys()):
         print(f'Writing "{label}" to file.')
         p = os.path.join(filepath, 'processed_data/')
         f = label + '.h5ad'
@@ -224,21 +227,23 @@ def pipeline(to_include: list):
 
     included_labels = get_labels(to_include)
 
-    datasets = read_files(filepath, included_labels)
+    datasets = get_datasets(included_labels)
 
-    prep_for_hvg_sel(datasets, included_labels)
+    read_files(filepath, datasets)
 
-    extract_common_hvgs(datasets, included_labels, n_top_genes=2000)
+    prep_for_hvg_sel(datasets)
 
-    pseudobulk(datasets, included_labels)
+    extract_common_hvgs(datasets, n_top_genes=2000)
+
+    pseudobulk(datasets)
     
-    normalize(datasets, included_labels)
+    normalize(datasets)
 
-    add_metadata(datasets, filepath, included_labels)
+    add_metadata(datasets, filepath)
 
-    save_files(datasets, filepath, included_labels)
+    save_files(datasets, filepath)
 
-    draw_umaps(datasets, included_labels)
+    draw_umaps(datasets)
 
     print('Pipeline completed')
 
