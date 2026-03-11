@@ -120,52 +120,65 @@ class PathwayNetwork:
         return matrices
 
 
-# Sökvägar:
+# Paths:
 INPUT_DIR = '/data/shared/alzgene26/data/conv_data/'
 OUTPUT_DIR = '/data/shared/alzgene26/PathwayData/'
 CONNECTIVITY_FILE = '/data/shared/alzgene26/PathwayData/binn_connectivity.csv'
 
 def main():
-    print("=== STARTAR KOMPLETT MASK-GENERERING ===")
+    print("=== STARTING FULL MASK GENERATION ===")
     
-    # Läs in nätverket en gång (gemensamt för alla)
-    print("Läser in gemensam nätverksstruktur...")
+    # Read the network connectivities
+    # includes both gene to pathway and pathway to pathway
+    print("Reading connectivities")
     network_df = pd.read_csv(CONNECTIVITY_FILE).dropna(subset=['child', 'parent']).astype(str)
-    is_pathway = network_df['child'].str.contains('R-HSA-|R-XTR-')
-    mapping_df_all = network_df[~is_pathway].rename(columns={'child': 'input', 'parent': 'translation'})
-    pathway_df = network_df[is_pathway].rename(columns={'child': 'source', 'parent': 'target'})
     
-    # Hitta alla celltyper (.h5ad-filer)
+    # True if the child element is a pathway (pathway-pathway entries)
+    is_pathway = network_df['child'].str.contains('R-HSA-')
+
+    pathway_pathway_mapping = network_df[is_pathway]
+    pathway_pathway_mapping.rename(columns={'child': 'source', 'parent': 'target'})
+    
+    gene_pathway_mapping = network_df[~is_pathway]
+    gene_pathway_mapping.rename(columns={'child': 'input', 'parent': 'translation'})
+
+    # convert to lists of tuples
+    pathway_pathway_mapping = list(pathway_pathway_mapping.itertuples(index=False, name=None))
+    gene_pathway_mapping = list(gene_pathway_mapping.itertuples(index=False, name=None))
+
+    # Find all cell types (.h5ad-files)
     cell_files = [f for f in os.listdir(INPUT_DIR) if f.endswith('.h5ad')]
-    print(f"Hittade {len(cell_files)} celltyper att bearbeta.\n")
+    print(f"Found {len(cell_files)} cell types to process.\n")
 
     for file_name in cell_files:
         cell_name = file_name.replace('.h5ad', '')
-        print(f">>> BEARBETAR: {cell_name}")
+        print(f">>> Processing: {cell_name}")
         
         try:
-            # Läs in AnnData
+            # Read AnnData
             adata = sc.read_h5ad(os.path.join(INPUT_DIR, file_name), backed='r')
+            # Extract all relevant genes
             gene_list = adata.var_names.tolist()
             
-            # Skapa nätverksobjektet
+            # Create pathway network object
             pn = PathwayNetwork(gene_list, 
-                                list(pathway_df.itertuples(index=False, name=None)),
-                                list(mapping_df_all.itertuples(index=False, name=None)))
+                                pathway_pathway_mapping,
+                                gene_pathway_mapping
+                                )
             
-            # Generera matriser (4 lager nu. Ändra sen?)
+            # Generate matrixes NOTE: (4 layers, change later?)
             matrices = pn.get_connectivity_matrices(n_layers=4)
             
-            # Spara varje matris med celltypens namn
+            # Save every matrix with the name of the cell type
             for i, m in enumerate(matrices):
                 out_path = os.path.join(OUTPUT_DIR, f"{cell_name}_layer_{i}_mask.csv")
                 m.to_csv(out_path)
-                print(f"      Sparad: {out_path} (Shape: {m.shape})")
+                print(f"      Saved: {out_path} (Shape: {m.shape})")
                 
         except Exception as e:
-            print(f"      [FEL] Kunde inte bearbeta {cell_name}: {e}")
+            print(f"      [ERROR] could not process {cell_name}: {e}")
             
-    print("\n=== ALLA CELLTYPER ÄR KLARA ===")
+    print("\n=== ALL CELL TYPES PROCESSED ===")
 
 if __name__ == "__main__":
     main()
