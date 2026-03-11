@@ -58,7 +58,7 @@ def save(project_path: str,
         full_network: pd.DataFrame, 
         save_network: bool) -> None:
 
-    if save_network == True:
+    if save_network:
         fname_save = 'binn_connectivity.csv'
         full_path_save = os.path.join(project_path, fname_save)
         print(full_path_save)
