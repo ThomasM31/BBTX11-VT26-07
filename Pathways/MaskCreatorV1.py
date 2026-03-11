@@ -122,8 +122,8 @@ class PathwayNetwork:
 
 # Sökvägar:
 INPUT_DIR = '/data/shared/alzgene26/data/conv_data/'
-OUTPUT_DIR = '/data/shared/alzgene26/PathwaysLA/'
-CONNECTIVITY_FILE = '/data/shared/alzgene26/PathwaysLA/binn_connectivity.csv'
+OUTPUT_DIR = '/data/shared/alzgene26/PathwayData/'
+CONNECTIVITY_FILE = '/data/shared/alzgene26/PathwayData/binn_connectivity.csv'
 
 def main():
     print("=== STARTAR KOMPLETT MASK-GENERERING ===")
