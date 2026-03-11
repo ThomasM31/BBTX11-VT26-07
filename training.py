@@ -2,8 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from binn_copy import BINN
-from preprocessing import custom_train_test_split
+from binn import BINN
+from preprocessing import custom_train_test_split_modified
 
 in_features=99999# Integers of how many genes we have as input
 layer_list=[] # List of integers, which describes how many layers and how many nodes each layer has
@@ -11,16 +11,37 @@ mask_list=[] # List of binary tensors (binary matrices) that restricts each laye
 
 binn=BINN(in_features,layer_list,mask_list)
 
-# In the example flower model they have imported train_test_split
-# We have the custom_train_test_split which returns train_adata, test_adata
+############################################################
 
-train_adata, test_adata = custom_train_test_split(0.8,0) # SPlit and celltype
+# Copied from Thomas baselinemodel.py  
+
+def read_adata(indices: list, train_size=0.8):
+    train_adata, test_adata, collection = custom_train_test_split_modified.pipeline(indices, train_size)
+    return train_adata, test_adata, collection
+    
+def xy_datasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
+    X_train = train_adata.X
+    y_train = train_adata.obs["AD_status"]
+    X_test = test_adata.X
+    y_test = test_adata.obs["AD_status"]
+
+    return X_train, y_train, X_test, y_test
 
 
+train_adata, test_adata, acollection = read_adata([0,1,2,3,4,5,6,7,8], train_size=0.8)
 
-# We can maybe use same train test split as Thomas to get X and y training and test data
+###########################################################
+
+
+X_train, y_train, X_test, y_test = xy_datasplit(train_adata,test_adata)
+
+# We can  use same train test split as Thomas to get X and y training and test data
 # X will be the gene expression data
 # y will be the AD status data
+
+
+
+# Using the data to train
 
 # Make into FloatTensors 
 X_train = torch.FloatTensor(X_train)
