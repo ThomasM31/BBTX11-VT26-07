@@ -15,18 +15,23 @@ from collections import defaultdict
 
 # Internal helper functions
 
-def _filter_relevant_gp_conns(relevant_genes: set[str], 
-                    gene_pathway_conn: list[tuple[str, str]]) -> list[tuple[str, str]]:
+def _filter_relevant_gp_conns(
+        relevant_genes: set[str], 
+        gene_pathway_conn: list[tuple[str, str]]
+        ) -> list[tuple[str, str]]:
     '''
     Extracts relevant gene-pathway connections:
     keeps entry only if the gene exists in the clinical data set
     '''
     return [tup for tup in gene_pathway_conn if tup[0] in relevant_genes]
 
-def _filter_relevant_pp_cons(pathway_pathway_conn: list[tuple[str, str]],
-                            gene_pathway_conn: list[tuple[str, str]]) -> list:
+def _filter_relevant_pp_cons(
+        pathway_pathway_conn: list[tuple[str, str]],
+        gene_pathway_conn: list[tuple[str, str]]
+        ) -> list:
     '''
-    Returns relevant pathway-pathway connections, i.e. pathways that are downstream of the genes that exist in the clinical data set.
+    Returns relevant pathway-pathway connections, i.e. pathways that are 
+    downstream of the genes that exist in the clinical data set.
     '''
 
     def add_pathways(idx_list: list, relevant_pathways: list[tuple[str, str]]):
@@ -36,8 +41,10 @@ def _filter_relevant_pp_cons(pathway_pathway_conn: list[tuple[str, str]],
         # concatenate
         updated_idx_list = idx_list + relevant_pathways
 
-        # filter for child pathways that are connected to a gene that exists in the clinical dataset
-        subsetted = [tup for tup in pathway_pathway_conn if tup[0] in relevant_pathways]
+        # filter for child pathways that are connected to a gene that 
+        # exists in the clinical dataset
+        subsetted = [tup for tup in pathway_pathway_conn 
+                    if tup[0] in relevant_pathways]
 
         # list of parent pathways, intermediate conversion to set
         new_target = list({p[1] for p in subsetted})
@@ -61,7 +68,9 @@ def _get_flattened_gp_hierarchy(
         gene_pathway_conn: list[tuple[str, str]]
         ) -> pd.DataFrame:
     '''
-    Returns a data frame with columns input (gene) and connections (pathway ID), which represents a flattened hierarchy of all genes and pathways that are (indirectly) connected
+    Returns a data frame with columns input (gene) and connections (pathway ID), 
+    which represents a flattened hierarchy of all genes and pathways that are 
+    (perhaps indirectly) connected
     '''
     
     # directed graph
@@ -91,7 +100,10 @@ def _get_flattened_gp_hierarchy(
         for pathway_id in parent_pathways:
             if graph.has_node(pathway_id):
                 # get all ancestors/descendant reachable in the graph
-                reachable_nodes = nx.single_source_shortest_path(graph, pathway_id).keys()
+                reachable_nodes = (
+                    nx.single_source_shortest_path(graph, pathway_id)
+                    .keys())
+                    
                 for conn in reachable_nodes:
                     components["input"].append(gene)
                     components["connections"].append(conn)
@@ -124,7 +136,12 @@ def _get_layer_adjacency_matrix(layer: dict) -> pd.DataFrame:
     # transpose to correct shape
     return df.infer_objects(copy=False).fillna(0).T
 
-def _add_edges(sub_graph: nx.DiGraph, node: str, n_layers: int) -> nx.DiGraph:
+def _add_edges(
+        sub_graph: nx.DiGraph, 
+        node: str, 
+        n_layers: int
+        ) -> nx.DiGraph:
+    
     '''Adds skip connections until depth n_layers is reached'''
     source = node
     
@@ -136,9 +153,10 @@ def _add_edges(sub_graph: nx.DiGraph, node: str, n_layers: int) -> nx.DiGraph:
         source = target
     return sub_graph
 
-def _get_normalized_subgraph(pathway_graph: nx.DiGraph, 
-                             n_layers: int = 4
-                             ) -> nx.DiGraph:
+def _get_normalized_subgraph(
+        pathway_graph: nx.DiGraph, 
+        n_layers: int = 4
+        ) -> nx.DiGraph:
     """
     Ensure that every path in the network has the depth n_layers.
     Returns a layer normalized subgraph.
@@ -211,25 +229,32 @@ def _get_network_layers(
 
 # Huvudklass:
 class PathwayNetwork:
-    def __init__(self, 
-                 relevant_genes: set[str], 
-                 pathway_pathway_conn: list[tuple[str, str]], 
-                 gene_pathway_conn: list[tuple[str, str]]):
+    def __init__(
+        self, 
+        relevant_genes: set[str], 
+        pathway_pathway_conn: list[tuple[str, str]], 
+        gene_pathway_conn: list[tuple[str, str]]
+        ) -> None:
 
         self.relevant_genes = relevant_genes
         
         # Filters relevant gene-pathway conns (gene exists in clinical data set)
-        self.gene_pathway_conn = _filter_relevant_gp_conns(self.relevant_genes, gene_pathway_conn)
+        self.gene_pathway_conn = _filter_relevant_gp_conns(
+            self.relevant_genes, gene_pathway_conn)
         
-        # Filters to only keep pathway-pathway conns that are downstream of genes that exist in the clinical data set
-        self.pathway_pathway_conn = _filter_relevant_pp_cons(pathway_pathway_conn, 
-        self.gene_pathway_conn)
+        # Filters to only keep pathway-pathway conns that are 
+        # downstream of genes that exist in the clinical data set
+        self.pathway_pathway_conn = _filter_relevant_pp_cons(
+            pathway_pathway_conn, self.gene_pathway_conn)
 
-        # Creates a flattened hierearchy in the form of a data frame with all genes and pathways that are connected
-        self.flattened_gp_hierarchy = _get_flattened_gp_hierarchy(self.pathway_pathway_conn, self.gene_pathway_conn)
+        # Creates a flattened hierearchy in the form of a data frame 
+        # with all genes and pathways that are connected
+        self.flattened_gp_hierarchy = _get_flattened_gp_hierarchy(
+            self.pathway_pathway_conn, self.gene_pathway_conn)
         
-        # filters for the genes that are actually connected to a pathway network, removes duplicates, sorts alphabetical for consistency
-        self.input_genes = sorted(set(self.flattened_gp_hierarchy["input"].tolist()))
+        # filters for the genes that are actually connected to a 
+        # pathway network, removes duplicates, sorts alphabetical for consistency
+        self.input_genes = sorted(set(self.flattened_gp_hierarchy["input"]))
         
         # directed graph
         G = nx.DiGraph()
@@ -241,14 +266,18 @@ class PathwayNetwork:
         
         # find root nodes (with in-degree 0), represent high level 'broad' networks
         root_nodes = [n for n, d in self.pathway_graph.in_degree() 
-              if d == 0 and n != "output_node"]
+                      if d == 0 and n != "output_node"]
         
         # adds output node as connection to each root node,
         # because each path should lead to the final output
         for node in root_nodes:
             self.pathway_graph.add_edge("output_node", node)
 
-    def get_connectivity_matrices(self, n_layers: int) -> list[pd.DataFrame]:
+    def get_connectivity_matrices(
+            self, 
+            n_layers: int
+            ) -> list[pd.DataFrame]:
+        
         normalized_subgraph = _get_normalized_subgraph(self.pathway_graph, n_layers)
         network_layers = _get_network_layers(normalized_subgraph, n_layers)
         
@@ -264,7 +293,8 @@ class PathwayNetwork:
             clean_pathway = re.sub(r"_copy.*", "", n)
             
             # connect sub-pathways to genes
-            term_map[clean_pathway] = grouped_genes.get(clean_pathway, np.array([])).tolist()
+            term_map[clean_pathway] = grouped_genes.get(
+                clean_pathway, np.array([])).tolist()
         
         network_layers.append(term_map)
 
@@ -295,7 +325,7 @@ class PathwayNetwork:
 
 # Paths:
 INPUT_DIR = '/data/shared/alzgene26/data/processed_data/'
-OUTPUT_DIR = '/data/shared/alzgene26/PathwayData/'
+OUTPUT_DIR = '/data/shared/alzgene26/PathwayData/MaskMatrixLayers'
 CONNECTIVITY_FILE = '/data/shared/alzgene26/PathwayData/binn_connectivity.csv'
 
 def main():
@@ -304,7 +334,9 @@ def main():
     # Read the network connectivities
     # includes both gene to pathway and pathway to pathway
     print("Reading connectivities")
-    network_df = pd.read_csv(CONNECTIVITY_FILE).dropna(subset=['child', 'parent']).astype(str)
+    network_df = (pd.read_csv(CONNECTIVITY_FILE)
+                 .dropna(subset=['child', 'parent'])
+                 .astype(str))
     
     # True if the child element is a pathway (pathway-pathway entries)
     is_pathway = network_df['child'].str.contains('R-HSA-')
@@ -324,7 +356,7 @@ def main():
     print(f"Found {len(cell_files)} cell types to process.\n")
 
     for file_name in cell_files:
-        cell_name = file_name.replace('.h5ad', '')
+        cell_name = file_name.removesuffix('.h5ad')
         print(f">>> Processing: {cell_name}")
         
         try:
