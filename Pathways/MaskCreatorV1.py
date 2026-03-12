@@ -14,30 +14,58 @@ import scanpy as sc
 
 # Interna hjälpfkt:er (biologisk logik)
 
-def _subset_mapping(input_data, mapping):
-    return [m for m in mapping if m[0] in input_data]
+def _filter_relevant_gp_conns(relevant_genes: set[str], 
+                    gene_pathway_conn: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    '''
+    Extracts relevant gene-pathway connections:
+    keeps entry only if the gene exists in the clinical data set
+    '''
+    return [tup for tup in gene_pathway_conn if tup[0] in relevant_genes]
 
-def _subset_pathways_on_idx(pathways, mapping):
-    def add_pathways(idx_list, target):
-        if not target: return idx_list
-        updated_idx_list = idx_list + target
-        subsetted = [p for p in pathways if p[0] in target]
+def _filter_relevant_pp_cons(pathway_pathway_conn: list[tuple[str, str]],
+                            gene_pathway_conn: list[tuple[str, str]]) -> list:
+    '''
+    Returns relevant pathway-pathway connections, i.e. pathways that are downstream of the genes that exist in the clinical data set.
+    '''
+
+    def add_pathways(idx_list: list, relevant_pathways: list[tuple[str, str]]):
+        # ends when relevant_pathways is empty
+        if not relevant_pathways: return idx_list
+        
+        # concatenate
+        updated_idx_list = idx_list + relevant_pathways
+
+        # filter for child pathways that are connected to a gene that exists in the clinical dataset
+        subsetted = [tup for tup in pathway_pathway_conn if tup[0] in relevant_pathways]
+
+        # list of parent pathways, intermediate conversion to set
         new_target = list({p[1] for p in subsetted})
+        
+        # recursive until list of relevant pathways is empty
         return add_pathways(updated_idx_list, new_target)
-    original_target = list({m[1] for m in mapping})
-    idx_list = add_pathways([], original_target)
-    return [p for p in pathways if p[0] in idx_list]
+    
+    # list of relevant pathways from gene-pathway connections 
+    # (input only has genes that exist in the data set)
+    relevant_pathways = list({m[1] for m in gene_pathway_conn})
+    
+    # filter pathway-pathway connections
+    idx_list = add_pathways([], relevant_pathways)
 
-def _get_mapping_to_all_layers(pathways, mapping):
+    # list of relevant pathway-pathway connections
+    res = [tup for tup in pathway_pathway_conn if tup[0] in idx_list]
+    print(res)
+    return res
+
+def _get_mapping_to_all_layers(pathway_pathway_conn, gene_pathway_conn):
     graph = nx.DiGraph()
-    graph.add_edges_from(pathways)
+    graph.add_edges_from(pathway_pathway_conn)
     components = {"input": [], "connections": []}
-    unique_inputs = {m[0] for m in mapping}
+    unique_inputs = {m[0] for m in gene_pathway_conn}
     total = len(unique_inputs)
     print(f"      -> Mappar {total} gener till Reactome-stigar...")
     for i, inp in enumerate(unique_inputs):
         if i % 5000 == 0 and i > 0: print(f"         ...bearbetat {i}/{total} gener")
-        translation_nodes = [m[1] for m in mapping if m[0] == inp]
+        translation_nodes = [m[1] for m in gene_pathway_conn if m[0] == inp]
         for node_id in translation_nodes:
             if graph.has_node(node_id):
                 reachable_nodes = nx.single_source_shortest_path(graph, node_id).keys()
@@ -87,15 +115,27 @@ def _get_layers_from_net(net, n_layers):
 
 # Huvudklass:
 class PathwayNetwork:
-    def __init__(self, input_data, pathways, mapping):
-        self.input_data = input_data
-        self.mapping = _subset_mapping(self.input_data, mapping)
-        self.pathways = _subset_pathways_on_idx(pathways, self.mapping)
-        self.mapping = _get_mapping_to_all_layers(self.pathways, self.mapping)
-        self.inputs = sorted(set(self.mapping["input"].tolist()))
+    def __init__(self, 
+                 relevant_genes: set[str], 
+                 pathway_pathway_conn: list[tuple[str, str]], 
+                 gene_pathway_conn: list[tuple[str, str]]):
+
+        self.relevant_genes = relevant_genes
+        
+        # Filters relevant gene-pathway conns (gene exists in clinical data set)
+        self.gene_pathway_conn = _filter_relevant_gp_conns(self.relevant_genes, gene_pathway_conn)
+        
+        # Filters to only keep pathway-pathway conns that are downstream of genes that exist in the clinical data set
+        self.pathway_pathway_conn = _filter_relevant_pp_cons(pathway_pathway_conn, 
+        self.gene_pathway_conn)
+
+        self.gene_pathway_conn = _get_mapping_to_all_layers(self.pathway_pathway_conn, self.gene_pathway_conn)
+
+        exit()
+        self.inputs = sorted(set(self.gene_pathway_conn["input"].tolist()))
         
         G = nx.DiGraph()
-        G.add_edges_from(self.pathways)
+        G.add_edges_from(self.pathway_pathway_conn)
         self.pathway_graph = G.reverse()
         for node in [n for n, d in self.pathway_graph.in_degree() if d == 0]:
             self.pathway_graph.add_edge("output_node", node)
@@ -105,7 +145,7 @@ class PathwayNetwork:
         layers = _get_layers_from_net(comp_graph, n_layers)
         
         term_nodes = [n for n, d in comp_graph.out_degree() if d == 0]
-        term_map = {re.sub(r"_copy.*", "", n): self.mapping.loc[self.mapping["connections"] == re.sub(r"_copy.*", "", n), "input"].unique().tolist() for n in term_nodes}
+        term_map = {re.sub(r"_copy.*", "", n): self.gene_pathway_conn.loc[self.gene_pathway_conn["connections"] == re.sub(r"_copy.*", "", n), "input"].unique().tolist() for n in term_nodes}
         layers.append(term_map)
 
         matrices, curr_in = [], self.inputs
@@ -121,7 +161,7 @@ class PathwayNetwork:
 
 
 # Paths:
-INPUT_DIR = '/data/shared/alzgene26/data/conv_data/'
+INPUT_DIR = '/data/shared/alzgene26/data/processed_data/'
 OUTPUT_DIR = '/data/shared/alzgene26/PathwayData/'
 CONNECTIVITY_FILE = '/data/shared/alzgene26/PathwayData/binn_connectivity.csv'
 
@@ -157,11 +197,11 @@ def main():
         try:
             # Read AnnData
             adata = sc.read_h5ad(os.path.join(INPUT_DIR, file_name), backed='r')
-            # Extract all relevant genes
-            gene_list = adata.var_names.tolist()
+            # Extract all relevant genes, convert to set for faster lookup
+            gene_set = set(adata.var_names.tolist())
             
             # Create pathway network object
-            pn = PathwayNetwork(gene_list, 
+            pn = PathwayNetwork(gene_set, 
                                 pathway_pathway_mapping,
                                 gene_pathway_mapping
                                 )
