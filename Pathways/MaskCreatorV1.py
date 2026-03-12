@@ -11,8 +11,9 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import scanpy as sc
+from collections import defaultdict
 
-# Interna hjälpfkt:er (biologisk logik)
+# Internal helper functions
 
 def _filter_relevant_gp_conns(relevant_genes: set[str], 
                     gene_pathway_conn: list[tuple[str, str]]) -> list[tuple[str, str]]:
@@ -53,64 +54,159 @@ def _filter_relevant_pp_cons(pathway_pathway_conn: list[tuple[str, str]],
 
     # list of relevant pathway-pathway connections
     res = [tup for tup in pathway_pathway_conn if tup[0] in idx_list]
-    print(res)
     return res
 
-def _get_mapping_to_all_layers(pathway_pathway_conn, gene_pathway_conn):
+def _get_flattened_gp_hierarchy(
+        pathway_pathway_conn: list[tuple[str, str]], 
+        gene_pathway_conn: list[tuple[str, str]]
+        ) -> pd.DataFrame:
+    '''
+    Returns a data frame with columns input (gene) and connections (pathway ID), which represents a flattened hierarchy of all genes and pathways that are (indirectly) connected
+    '''
+    
+    # directed graph
     graph = nx.DiGraph()
+    # add all pathway-pathway connections as edges
     graph.add_edges_from(pathway_pathway_conn)
+
+    # map genes to immediate pathways for faster lookup
+    gene_to_pathways = defaultdict(list)
+    for gene, pathway in gene_pathway_conn:
+        gene_to_pathways[gene].append(pathway)
+    
     components = {"input": [], "connections": []}
-    unique_inputs = {m[0] for m in gene_pathway_conn}
-    total = len(unique_inputs)
-    print(f"      -> Mappar {total} gener till Reactome-stigar...")
-    for i, inp in enumerate(unique_inputs):
-        if i % 5000 == 0 and i > 0: print(f"         ...bearbetat {i}/{total} gener")
-        translation_nodes = [m[1] for m in gene_pathway_conn if m[0] == inp]
-        for node_id in translation_nodes:
-            if graph.has_node(node_id):
-                reachable_nodes = nx.single_source_shortest_path(graph, node_id).keys()
+    
+    # gene set
+    unique_genes = {m[0] for m in gene_pathway_conn}
+    nrGenes = len(unique_genes)
+
+    print(f'Mapping {nrGenes} genes to Reactome-paths...')
+    
+    for i, gene in enumerate(unique_genes):
+        if i % 5000 == 0 and i > 0: print(f"...processed {i}/{nrGenes} genes")
+
+        # list parent pathways of this particular gene 
+        parent_pathways = gene_to_pathways[gene]
+        
+        for pathway_id in parent_pathways:
+            if graph.has_node(pathway_id):
+                # get all ancestors/descendant reachable in the graph
+                reachable_nodes = nx.single_source_shortest_path(graph, pathway_id).keys()
                 for conn in reachable_nodes:
-                    components["input"].append(inp); components["connections"].append(conn)
+                    components["input"].append(gene)
+                    components["connections"].append(conn)
+    
+    # drop all duplicate rows (same gene & pathway)
+    # returns flattened hierarchy with gene and pathway columns
     return pd.DataFrame(components).drop_duplicates()
 
-def _get_map_from_layer(layer_dict):
-    pathways = list(layer_dict.keys())
-    all_inputs = list(itertools.chain.from_iterable(layer_dict.values()))
+def _get_layer_adjacency_matrix(layer: dict) -> pd.DataFrame:
+    '''
+    Returns per layer adjacency matrix with;
+    rows: genes
+    columns: pathways
+    '''
+    # row elements
+    pathways = list(layer.keys())
+
+    # column elements
+    all_inputs = list(itertools.chain.from_iterable(layer.values()))
     unique_inputs = list(np.unique(all_inputs))
+    
+    # creating an empty grid
     df = pd.DataFrame(index=pathways, columns=unique_inputs)
-    for pathway, inputs in layer_dict.items():
+    
+    # set cell to 1 if connection exists
+    for pathway, inputs in layer.items():
         df.loc[pathway, inputs] = 1
+
+    # set cell to 0 if no connection exists, 
+    # transpose to correct shape
     return df.infer_objects(copy=False).fillna(0).T
 
-def _add_edges(G, node, n_layers):
+def _add_edges(sub_graph: nx.DiGraph, node: str, n_layers: int) -> nx.DiGraph:
+    '''Adds skip connections until depth n_layers is reached'''
     source = node
-    for level in range(n_layers):
-        target = f"{node}_copy{level + 1}"
-        G.add_edge(source, target)
+    
+    for n in range(n_layers):
+        # just make a copy with the id of prev node + suffix
+        target = f"{node}_copy{n + 1}"
+        # adds skip connection
+        sub_graph.add_edge(source, target)
         source = target
-    return G
-
-def _complete_network(G, n_layers=4):
-    sub_graph = nx.ego_graph(G, "output_node", radius=n_layers)
-    terminal_nodes = [n for n, d in sub_graph.out_degree() if d == 0]
-    for node in terminal_nodes:
-        dist = len(nx.shortest_path(sub_graph, source="output_node", target=node))
-        if dist <= n_layers:
-            _add_edges(sub_graph, node, n_layers - dist + 1)
     return sub_graph
 
-def _get_nodes_at_level(net, distance):
-    nodes = set(nx.ego_graph(net, "output_node", radius=distance))
-    if distance >= 1:
-        nodes -= set(nx.ego_graph(net, "output_node", radius=distance - 1))
+def _get_normalized_subgraph(pathway_graph: nx.DiGraph, 
+                             n_layers: int = 4
+                             ) -> nx.DiGraph:
+    """
+    Ensure that every path in the network has the depth n_layers.
+    Returns a layer normalized subgraph.
+    """
+
+    # cuts of any paths more than n_layers deep
+    sub_graph = nx.ego_graph(pathway_graph, "output_node", radius=n_layers)
+    
+    # pathways that link directly to genes
+    terminal_nodes = [n for n, d in sub_graph.out_degree() if d == 0]
+    
+    for node in terminal_nodes:
+        # distance between output and terminal node
+        dist = len(nx.shortest_path(sub_graph, source="output_node", target=node))
+        
+        # pad with skip connections if depth is < n_layers
+        if dist <= n_layers:
+            _add_edges(sub_graph, node, n_layers - dist + 1)
+    
+    return sub_graph
+
+def _get_nodes_at_level(
+        normalized_subgraph: nx.DiGraph, 
+        n_layers: int
+        ) -> list[str]:
+    '''
+    Returns a list of nodes for one specific level of the network.
+    '''
+    # nodes max n steps away from output node
+    nodes = set(nx.ego_graph(normalized_subgraph, "output_node", radius=n_layers))
+    
+    # remove all lower level nodes, leaving only the ones exactly on layer n
+    if n_layers >= 1:
+        nodes -= set(nx.ego_graph(normalized_subgraph, "output_node", radius=n_layers - 1))
     return list(nodes)
 
-def _get_layers_from_net(net, n_layers):
+def _get_network_layers(
+        normalized_subgraph: nx.DiGraph, 
+        n_layers: int
+        ) -> list[dict]:
+    '''
+    Returns a list of dictionaries, one dict for each level of the network.
+    Each dictionary contains the following;
+    key: node
+    value: list of the node's successors
+    '''
+    
     layers = []
-    for dist in range(n_layers):
-        nodes = _get_nodes_at_level(net, dist)
-        l_map = {re.sub(r"_copy.*", "", n): [re.sub(r"_copy.*", "", s) for s in net.successors(n)] for n in nodes}
+    for n in range(n_layers):
+        nodes = _get_nodes_at_level(normalized_subgraph, n)
+
+        l_map = {}
+
+        for node in nodes:
+            # clean suffix from current node
+            clean_node = re.sub(r"_copy.*", "", node)
+
+            # find successors and clean suffix
+            clean_succesors = []
+            for successor in normalized_subgraph.successors(node):
+                clean_s = re.sub(r"_copy.*", "", successor)
+                clean_succesors.append(clean_s)
+            
+            l_map[clean_node] = clean_succesors
+        
+        # for each level, append a map of nodes an successors
         layers.append(l_map)
+    
     return layers
 
 # Huvudklass:
@@ -129,34 +225,71 @@ class PathwayNetwork:
         self.pathway_pathway_conn = _filter_relevant_pp_cons(pathway_pathway_conn, 
         self.gene_pathway_conn)
 
-        self.gene_pathway_conn = _get_mapping_to_all_layers(self.pathway_pathway_conn, self.gene_pathway_conn)
-
-        exit()
-        self.inputs = sorted(set(self.gene_pathway_conn["input"].tolist()))
+        # Creates a flattened hierearchy in the form of a data frame with all genes and pathways that are connected
+        self.flattened_gp_hierarchy = _get_flattened_gp_hierarchy(self.pathway_pathway_conn, self.gene_pathway_conn)
         
+        # filters for the genes that are actually connected to a pathway network, removes duplicates, sorts alphabetical for consistency
+        self.input_genes = sorted(set(self.flattened_gp_hierarchy["input"].tolist()))
+        
+        # directed graph
         G = nx.DiGraph()
+        # add all pathway-pathway connections as edges
         G.add_edges_from(self.pathway_pathway_conn)
+        
+        # reverses graph so that we get the direction parent->child
         self.pathway_graph = G.reverse()
-        for node in [n for n, d in self.pathway_graph.in_degree() if d == 0]:
+        
+        # find root nodes (with in-degree 0), represent high level 'broad' networks
+        root_nodes = [n for n, d in self.pathway_graph.in_degree() 
+              if d == 0 and n != "output_node"]
+        
+        # adds output node as connection to each root node,
+        # because each path should lead to the final output
+        for node in root_nodes:
             self.pathway_graph.add_edge("output_node", node)
 
-    def get_connectivity_matrices(self, n_layers):
-        comp_graph = _complete_network(self.pathway_graph, n_layers)
-        layers = _get_layers_from_net(comp_graph, n_layers)
+    def get_connectivity_matrices(self, n_layers: int) -> list[pd.DataFrame]:
+        normalized_subgraph = _get_normalized_subgraph(self.pathway_graph, n_layers)
+        network_layers = _get_network_layers(normalized_subgraph, n_layers)
         
-        term_nodes = [n for n, d in comp_graph.out_degree() if d == 0]
-        term_map = {re.sub(r"_copy.*", "", n): self.gene_pathway_conn.loc[self.gene_pathway_conn["connections"] == re.sub(r"_copy.*", "", n), "input"].unique().tolist() for n in term_nodes}
-        layers.append(term_map)
+        terminal_nodes = [n for n, d in normalized_subgraph.out_degree() if d == 0]
 
-        matrices, curr_in = [], self.inputs
-        for i, l_dict in enumerate(layers[::-1]):
+        # group genes for speed of compute
+        df_conn = pd.DataFrame(self.gene_pathway_conn, columns=["input", "connections"])
+        grouped_genes = df_conn.groupby("connections")["input"].unique()
+        
+        term_map = {}
+        for n in terminal_nodes:
+            # remove copy suffix from pathway
+            clean_pathway = re.sub(r"_copy.*", "", n)
+            
+            # connect sub-pathways to genes
+            term_map[clean_pathway] = grouped_genes.get(clean_pathway, np.array([])).tolist()
+        
+        network_layers.append(term_map)
+
+        matrices, curr_in = [], self.input_genes
+
+        # process network layers in reverse, input -> output
+        for i, layer_connections in enumerate(network_layers[::-1]):
             print(f"      ...beräknar matris för lager {i}")
-            mat = _get_map_from_layer(l_dict)
-            if i == 0: curr_in = sorted(mat.index); self.inputs = curr_in
-            merged = pd.DataFrame(index=curr_in).merge(mat, right_index=True, left_index=True, how="inner")
+            adj_mat = _get_layer_adjacency_matrix(layer_connections)
+            
+            # the network expects gene input in alphabetical order
+            if i == 0: 
+                curr_in = sorted(adj_mat.index); 
+                self.input_genes = curr_in
+            
+            # ensures only genes/pathways present in graph and current data are kept
+            merged = pd.DataFrame(index=curr_in).merge(
+                adj_mat, right_index=True, left_index=True, how="inner")
+            
+            # force rows and columns into alph order for consistency in network
             merged = merged.reindex(sorted(merged.columns), axis=1).sort_index()
             matrices.append(merged)
-            curr_in = list(mat.columns)
+            
+            # outputs of current layer is input for the next
+            curr_in = list(adj_mat.columns)
         return matrices
 
 
@@ -209,7 +342,7 @@ def main():
             # Generate matrixes NOTE: (4 layers, change later?)
             matrices = pn.get_connectivity_matrices(n_layers=4)
             
-            # Save every matrix with the name of the cell type
+            # Save every matrix with the name of the cell type and layer in network
             for i, m in enumerate(matrices):
                 out_path = os.path.join(OUTPUT_DIR, f"{cell_name}_layer_{i}_mask.csv")
                 m.to_csv(out_path)
