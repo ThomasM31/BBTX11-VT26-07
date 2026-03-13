@@ -43,5 +43,26 @@ def train_binn(model, train_loader, epochs = 10, lr = 0.001):
               f"Train Loss: {running_loss / len(train_loader):.3f} "
               f"Train Acc: {100*correct / total:.2f} % ")
 
-
     print("finished training")
+
+
+def test_binn(model, test_loader):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    model.eval()
+    
+    correct = 0
+    total = 0
+    
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs = inputs.to(device)
+            labels = labels.to(device).float().view(-1, 1)
+            
+            outputs = model(inputs)
+            
+            predicted = (outputs > 0.0).float()
+            correct += (predicted == labels).sum().item()
+            total += inputs.size(0)
+    
+    print(f"Test Acc: {100*correct / total:.2f} % ")
