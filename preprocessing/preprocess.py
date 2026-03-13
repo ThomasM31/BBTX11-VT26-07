@@ -48,7 +48,25 @@ def read_files(filepath: str, datasets: dict) -> None:
         datasets[label]['orig'] = ad.read_h5ad(f)
 
     return datasets
+def filter_cells(datasets: dict, min_genes: int=200, min_cells: int=200):
+    for label in list(datasets.keys()):
+        adata = datasets[label]['orig']
+        print(f"AnnData loaded, shape={adata.shape}\n")
+        
+        print(f"Filtering cells (with <{min_genes} genes) and genes (detected in <{min_cells} cells)...")
+        sc.pp.filter_cells(adata, min_genes=min_genes)
+        sc.pp.filter_genes(adata, min_cells=min_cells)
+        print(f"Filtered data, shape={adata.shape}\n")
 
+        print("Calculating QC metrics")
+        adata.var["mt"] = np.array(adata.var_names.str.startswith("MT-"), dtype=bool)
+        print("MT genes detected:", adata.var["mt"].sum())
+
+        sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True)
+
+        print("Dropping cells with >5% mitochondrial counts...")
+        datasets[label]['orig'] = adata[adata.obs.pct_counts_mt < 5, :].copy()
+        
 
 def prep_for_hvg_sel(datasets: dict) -> None:
     for label in list(datasets.keys()):
