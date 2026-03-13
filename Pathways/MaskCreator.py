@@ -302,7 +302,7 @@ class PathwayNetwork:
 
         # process network layers in reverse, input -> output
         for i, layer_connections in enumerate(network_layers[::-1]):
-            print(f"      ...beräknar matris för lager {i}")
+            print(f"      ...calculating matrix for layer {i}")
             adj_mat = _get_layer_adjacency_matrix(layer_connections)
             
             # the network expects gene input in alphabetical order
