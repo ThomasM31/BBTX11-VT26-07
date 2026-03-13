@@ -136,7 +136,7 @@ def _get_layer_adjacency_matrix(layer: dict) -> pd.DataFrame:
     # transpose to correct shape
     return df.infer_objects(copy=False).fillna(0).T
 
-def _add_edges(
+def _add_skip_connections(
         sub_graph: nx.DiGraph, 
         node: str, 
         n_layers: int
@@ -174,7 +174,7 @@ def _get_normalized_subgraph(
         
         # pad with skip connections if depth is < n_layers
         if dist <= n_layers:
-            _add_edges(sub_graph, node, n_layers - dist + 1)
+            _add_skip_connections(sub_graph, node, n_layers - dist + 1)
     
     return sub_graph
 
@@ -324,7 +324,7 @@ class PathwayNetwork:
 
 
 # Paths:
-INPUT_DIR = '/data/shared/alzgene26/data/processed_data/'
+INPUT_DIR = '/data/shared/alzgene26/data/conv_data/'
 OUTPUT_DIR = '/data/shared/alzgene26/PathwayData/MaskMatrixLayers'
 CONNECTIVITY_FILE = '/data/shared/alzgene26/PathwayData/binn_connectivity.csv'
 
