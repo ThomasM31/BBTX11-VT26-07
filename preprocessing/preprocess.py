@@ -48,7 +48,9 @@ def read_files(filepath: str, datasets: dict) -> None:
         datasets[label]['orig'] = ad.read_h5ad(f)
 
     return datasets
-def filter_cells(datasets: dict, min_genes: int=200, min_cells: int=200):
+
+
+def filter_cells(datasets: dict, min_genes: int=200, min_cells: int=200) -> None:
     for label in list(datasets.keys()):
         adata = datasets[label]['orig']
         print(f"AnnData loaded, shape={adata.shape}\n")
@@ -248,6 +250,8 @@ def pipeline(to_include: list):
     datasets = get_datasets(included_labels)
 
     read_files(filepath, datasets)
+
+    filter_cells(datasets, min_cells=200, min_genes=200)
 
     prep_for_hvg_sel(datasets)
 
