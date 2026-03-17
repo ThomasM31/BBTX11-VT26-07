@@ -7,13 +7,18 @@ def pipeline(
         to_include: list, 
         n_top_genes: int, 
         min_genes: int, 
-        min_cells:int, 
+        min_cells:int,
+        min_common_hvgs:int,
+        common_hvg_inc_value:int,  
         draw_umaps: bool
         ) -> None:
     
     ### To read from and write to current users folders
-    user = os.environ.get('USER') or os.environ.get('USERNAME')
-    base_path = Path("/data/users") / user / "kand/data/"
+    #user = os.environ.get('USER') or os.environ.get('USERNAME')
+    #base_path = Path("/data/users") / user / "kand/data/"
+    
+    # To read from and write to the shared folder
+    base_path = Path("/data/shared/alzgene26/data")
     filepath = str(base_path)
 
     # from int to readable labels
@@ -31,23 +36,24 @@ def pipeline(
     # filter lowly expressed genes
     filter_genes(datasets, min_cells=200)
 
-    # normalize for HVG selection
-    #prep_for_hvg_sel(datasets)
-
-    # write n most variable hvgs per cell type to txt file
-    #extract_per_cell_type_hvgs(datasets, filepath, n_top_genes)
-
     # make one .txt file for each cell type with 
     # genes sorted from most to least variable
     # this method does not require normalized data
     extract_hvgs_full_list(datasets, filepath)
 
     # find and filter common hvgs, from txt files
-    filter_shared_hvgs(datasets, filepath, n_top_genes)
+    find_common_hvgs(datasets, filepath, n_top_genes, min_common_hvgs, common_hvg_inc_value)
+    
+    # user needs to supply the hvg file name (assumes it is in hvg_lists/)
+    hvg_file = str(input('Supply file with common hvgs'))
+    
+    # filter by common hvgs
+    filter_common_hvgs(datasets, filepath, hvg_file)
 
     # sum counts per subject and high res cell type
     pseudobulk(datasets)
     
+    #  normalize per pseudobulk sample
     normalize(datasets)
 
     # add disease status
@@ -100,6 +106,22 @@ if __name__ == "__main__":
 
     # Optional argument
     parser.add_argument(
+        "--min_common_hvgs", 
+        type=int,
+        default=1000,
+        help="Target for minimum nr of common hvgs"
+    )
+
+    # Optional argument
+    parser.add_argument(
+        "--common_hvg_inc_value", 
+        type=int,
+        default=3000,
+        help="Amount to increment n_top_genes if nr common genes is under target."
+    )
+
+    # Optional argument
+    parser.add_argument(
         "--draw_umaps", 
         type=bool,
         default=False,
@@ -113,5 +135,15 @@ if __name__ == "__main__":
     min_cells = args.gene_in_min_cells
     min_genes = args.cell_with_min_genes
     draw_umaps = args.draw_umaps
+    min_common_hvgs = args.min_common_hvgs
+    common_hvg_inc_value = args.common_hvg_inc_value
 
-    pipeline(to_include, n_top_genes=n_top, min_genes=min_genes, min_cells=min_cells, draw_umaps=draw_umaps)
+    pipeline(
+        to_include, 
+        n_top_genes=n_top, 
+        min_genes=min_genes, 
+        min_cells=min_cells, 
+        min_common_hvgs=min_common_hvgs, 
+        common_hvg_inc_value=common_hvg_inc_value, 
+        draw_umaps=draw_umaps
+        )

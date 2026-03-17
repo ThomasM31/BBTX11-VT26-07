@@ -186,7 +186,14 @@ def extract_hvgs_full_list(datasets: dict, filepath: str):
                 output.write(str(gene) + '\n')
 
 
-def filter_shared_hvgs(datasets: dict, filepath: str,  n_top_genes: int, min_common: int = 1000) -> bool:
+def find_common_hvgs(
+    datasets: dict, 
+    filepath: str,  
+    n_top_genes: int, 
+    min_common: int = 1000, 
+    inc_val: int = 3000
+    ) -> None:
+    
     p = os.path.join(filepath, 'processed_data/hvg_lists')
 
     files = [f.name for f in Path(p).iterdir() if f.is_file()]
@@ -196,14 +203,11 @@ def filter_shared_hvgs(datasets: dict, filepath: str,  n_top_genes: int, min_com
     rel_files = []
     for label in datasets.keys():
         for file in files:
-            #has_correct_ntop = file.find(f'ntop_{n_top_genes}.')
-            has_correct_ntop = file.endswith('desc.txt')
+            is_hvgs_descending = file.endswith('desc.txt')
             is_correct_label = file.startswith(label)
 
-            if has_correct_ntop and is_correct_label:
+            if is_hvgs_descending and is_correct_label:
                 rel_files.append(file)
-
-    print(rel_files)
     
     hvgs = []  
     for i, file in enumerate(rel_files):
@@ -212,33 +216,46 @@ def filter_shared_hvgs(datasets: dict, filepath: str,  n_top_genes: int, min_com
             genes = input.readlines()
             hvgs.append([g.strip('\n') for g in genes])
 
-    def get_common(hvgs: list, n_top_genes: int):
+    def get_common(hvgs: list, n_top_genes: int) -> list:
         # find the genes that are HVGs for all datasets (intersection)
         common_hvgs = set(hvgs[0][0:n_top_genes])
         for i, hvg in enumerate(hvgs):
             common_hvgs = common_hvgs & set(hvgs[i][0:n_top_genes])
         common_hvgs = list(common_hvgs)
 
-        print(f'Nr common HVGs for {list(datasets.keys())}: {len(common_hvgs)}')
-
-        if len(common_hvgs) < min_common:
-            print(f'------ TOO FEW COMMON HVGs with n_top_genes={n_top_genes}. Incrementing. ------')
-            n_top_genes += 3000
-            get_common(hvgs, n_top_genes)
-        
-        print(f'Found {len(common_hvgs)} common HVGs with n_top_genes={n_top_genes}')
         return common_hvgs
 
-    common_hvgs = get_common(hvgs, n_top_genes)
+    common_hvgs = []
+    n = n_top_genes
+    while len(common_hvgs) < min_common:
+        common_hvgs = get_common(hvgs, n)
+        n += inc_val
 
-    # keep only common HVGs
-    for label in list(datasets.keys()):
-        l = f'common_hvgs'
-        datasets[label].uns[l] = datasets[label][:, common_hvgs].copy()
+    print(f'Found {len(common_hvgs)} common HVGs with n_top_genes={n}')
+    
+    included = "_".join(datasets.keys())
+
+    # create text file of all common HVGs
+    fname = f'{included}_ntop_{n}_common_{len(common_hvgs)}.txt'
+    to = os.path.join(filepath, fname)
+    with open(to, 'w') as output:
+        for gene in common_hvgs:
+            output.write(str(gene) + '\n')
+
+    
+def filter_common_hvgs(datasets: dict, filepath: str, hvg_file:str) -> None:
+    p = os.path.join(filepath, 'processed_data/hvg_lists')
+    
+    path = os.path.join(p, hvg_file)
+    with open(path, 'r') as input:
+        genes = input.readlines()
+        common_hvgs = [g.strip('\n') for g in genes]
+
+    ## save common hvgs in adata object
+    for label, adata in datasets.items():
+        adata.uns['common_hvgs'] = adata[:, common_hvgs].copy()
         print(f'Writing common hvgs to datset for {label}.')
-        print(datasets[label].uns[l])
-
-    return True
+        print(adata.uns['common_hvgs'])
 
 def pseudobulk(datasets: dict) -> None:
     # Perform pseudobulk by test subject and high res celltype
@@ -351,7 +368,6 @@ def add_metadata(datasets: dict, filepath: str, is_float=True) -> None:
 
 
 def save_files(datasets: dict, filepath: str, stage:str) -> None:
-    # Save pseudobatched data
     print(f'Writing files at stage {stage}')
     
     for label in list(datasets.keys()):

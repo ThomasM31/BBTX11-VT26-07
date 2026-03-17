@@ -52,7 +52,6 @@ if __name__ == "__main__":
         description = "Pre-process anndata objects and save as .h5ad"
     )
 
-    
     parser.add_argument(
         "hvg_file",
         type=str,

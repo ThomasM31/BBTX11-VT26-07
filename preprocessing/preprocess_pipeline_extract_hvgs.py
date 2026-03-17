@@ -16,6 +16,10 @@ def pipeline(
     ### To read from and write to current users folders
     user = os.environ.get('USER') or os.environ.get('USERNAME')
     base_path = Path("/data/users") / user / "kand/data/"
+    
+    # To read from and write to the shared folder
+    #base_path = Path("/data/shared/alzgene26/data")
+    
     filepath = str(base_path)
 
     # from int to readable labels
@@ -37,6 +41,8 @@ def pipeline(
     # genes sorted from most to least variable
     # this method does not require normalized data
     extract_hvgs_full_list(datasets, filepath)
+
+    save_files(datasets, filepath, 'hvg')
 
     print('HVG extraction pipeline completed')
 
