@@ -4,16 +4,17 @@ import os
 from pathlib import Path
 
 def pipeline(
+        hvg_file: str,
         to_include: list, 
-        n_top_genes: int, 
-        min_genes: int, 
-        min_cells:int, 
         draw_umaps: bool
         ) -> None:
     
     ### To read from and write to current users folders
     user = os.environ.get('USER') or os.environ.get('USERNAME')
     base_path = Path("/data/users") / user / "kand/data/"
+    
+    # To read from and write to the shared folder
+    #base_path = Path("/data/shared/alzgene26/data")
     filepath = str(base_path)
 
     # from int to readable labels
@@ -23,31 +24,16 @@ def pipeline(
     datasets = get_datasets(included_labels)
 
     # read h5ad files, add to datasets dict
-    read_files(datasets, filepath)
+    # this time from the 'hvg' folder
+    read_hvg_adata(datasets, filepath)
 
-    # filter bad cells
-    filter_cells(datasets, min_genes=200)
-
-    # filter lowly expressed genes
-    filter_genes(datasets, min_cells=200)
-
-    # normalize for HVG selection
-    #prep_for_hvg_sel(datasets)
-
-    # write n most variable hvgs per cell type to txt file
-    #extract_per_cell_type_hvgs(datasets, filepath, n_top_genes)
-
-    # make one .txt file for each cell type with 
-    # genes sorted from most to least variable
-    # this method does not require normalized data
-    extract_hvgs_full_list(datasets, filepath)
-
-    # find and filter common hvgs, from txt files
-    filter_shared_hvgs(datasets, filepath, n_top_genes)
+    # filter by common hvgs
+    filter_common_hvgs(datasets, filepath, hvg_file)
 
     # sum counts per subject and high res cell type
     pseudobulk(datasets)
     
+    #  normalize per pseudobulk sample
     normalize(datasets)
 
     # add disease status
@@ -66,36 +52,20 @@ if __name__ == "__main__":
         description = "Pre-process anndata objects and save as .h5ad"
     )
 
+    
+    parser.add_argument(
+        "hvg_file",
+        type=str,
+        metavar="FILE",
+        help="Path to the file containing common Highly Variable Genes (HVGs)."
+    )
+
     # Positional argument: accepts one or more integers
     parser.add_argument(
         "to_include",
         type=int,        
         nargs='+',       
         help="indices to include: \n0=astro \n1=exc1 \n2=exc2 \n3=exc3 \n4=immune \n5=inhi \n6=oligo \n7=opcs \n8=vasc",
-    )
-
-    # Optional argument n_top_genes
-    parser.add_argument(
-        "--n_top_genes", 
-        type=int,
-        default=2000,
-        help="Number of highly variable genes to keep (default: 2000)"
-    )
-
-    # Optional argument
-    parser.add_argument(
-        "--gene_in_min_cells", 
-        type=int,
-        default=200,
-        help="Filter out genes that are expressed in less than n cells."
-    )
-
-    # Optional argument
-    parser.add_argument(
-        "--cell_with_min_genes", 
-        type=int,
-        default=200,
-        help="Filter out cells that have less than n gene expressions."
     )
 
     # Optional argument
@@ -108,10 +78,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    hvg_file = args.hvg_file
     to_include = args.to_include
-    n_top = args.n_top_genes
-    min_cells = args.gene_in_min_cells
-    min_genes = args.cell_with_min_genes
     draw_umaps = args.draw_umaps
 
-    pipeline(to_include, n_top_genes=n_top, min_genes=min_genes, min_cells=min_cells, draw_umaps=draw_umaps)
+    pipeline(
+        hvg_file,
+        to_include,
+        draw_umaps=draw_umaps
+        )

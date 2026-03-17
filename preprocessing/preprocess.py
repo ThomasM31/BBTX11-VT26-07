@@ -11,6 +11,8 @@ from anndata.experimental import AnnCollection
 from anndata.experimental.pytorch import AnnLoader
 ad.settings.allow_write_nullable_strings = True
 
+import scipy.misc
+
 def get_labels(to_include: list) -> list:
     labels = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
     included_labels = [labels[i] for i in to_include]
@@ -131,7 +133,10 @@ def prep_for_hvg_sel(datasets: dict) -> None:
         print(f'min after: {dataset_log.X.min()}, max after: {dataset_log.X.max():.1f}')
 
 
-def extract_per_cell_type_hvgs(datasets: dict, filepath: str, n_top_genes: int = 2000) -> None:
+def extract_per_cell_type_hvgs(datasets: dict, filepath: str, n_top_genes: int) -> None:
+    '''
+    Writes n most variable genes to text file, per submitted dataset.
+    '''
     filepath = os.path.join(filepath, 'processed_data/hvg_lists')
     # Keep only highly variable genes (HVGs)
     hvgs = []
@@ -143,7 +148,7 @@ def extract_per_cell_type_hvgs(datasets: dict, filepath: str, n_top_genes: int =
         # use log1p layer
         adata = datasets[label].uns['log1p']
 
-        sc.pp.highly_variable_genes(adata)
+        sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes)
         hvg_per_type = adata.var_names[adata.var.highly_variable].tolist()
 
         # save list of hvgs as textfile
@@ -159,8 +164,29 @@ def extract_per_cell_type_hvgs(datasets: dict, filepath: str, n_top_genes: int =
         print(f'Writing HVGs for {label}')
         print(datasets[label].uns['hvg'])
 
+def extract_hvgs_full_list(datasets: dict, filepath: str):
+    '''
+    Writes all genes to text file in order of descending variability.
+    '''
+    
+    filepath = os.path.join(filepath, 'processed_data/hvg_lists')
 
-def filter_shared_hvgs(datasets: dict, filepath: str,  n_top_genes = 2000):
+    for label, adata in datasets.items():
+        # seurat v3 flavor uses raw counts, normalized data not needed
+        sc.pp.highly_variable_genes(adata, flavor='seurat_v3')
+
+        sorted_genes = adata.var.sort_values('variances_norm', ascending=False).index.tolist()
+
+        # save list of hvgs as textfile
+        # will allow us to find common hvgs later
+        fname = f'{label}_sorted_by_variability_desc.txt'
+        to = os.path.join(filepath, fname)
+        with open(to, 'w') as output:
+            for gene in sorted_genes:
+                output.write(str(gene) + '\n')
+
+
+def filter_shared_hvgs(datasets: dict, filepath: str,  n_top_genes: int, min_common: int = 1000) -> bool:
     p = os.path.join(filepath, 'processed_data/hvg_lists')
 
     files = [f.name for f in Path(p).iterdir() if f.is_file()]
@@ -170,11 +196,14 @@ def filter_shared_hvgs(datasets: dict, filepath: str,  n_top_genes = 2000):
     rel_files = []
     for label in datasets.keys():
         for file in files:
-            has_correct_ntop = file.find(f'ntop_{n_top_genes}.')
+            #has_correct_ntop = file.find(f'ntop_{n_top_genes}.')
+            has_correct_ntop = file.endswith('desc.txt')
             is_correct_label = file.startswith(label)
 
             if has_correct_ntop and is_correct_label:
                 rel_files.append(file)
+
+    print(rel_files)
     
     hvgs = []  
     for i, file in enumerate(rel_files):
@@ -183,20 +212,33 @@ def filter_shared_hvgs(datasets: dict, filepath: str,  n_top_genes = 2000):
             genes = input.readlines()
             hvgs.append([g.strip('\n') for g in genes])
 
-    # find the genes that are HVGs for all datasets (intersection)
-    common_hvgs = set(hvgs[0])
-    for i, hvg in enumerate(hvgs):
-        common_hvgs = common_hvgs & set(hvgs[i])
-    common_hvgs = list(common_hvgs)
+    def get_common(hvgs: list, n_top_genes: int):
+        # find the genes that are HVGs for all datasets (intersection)
+        common_hvgs = set(hvgs[0][0:n_top_genes])
+        for i, hvg in enumerate(hvgs):
+            common_hvgs = common_hvgs & set(hvgs[i][0:n_top_genes])
+        common_hvgs = list(common_hvgs)
 
-    print(f'Nr common HVGs for {list(datasets.keys())}: {len(common_hvgs)}')
-    
+        print(f'Nr common HVGs for {list(datasets.keys())}: {len(common_hvgs)}')
+
+        if len(common_hvgs) < min_common:
+            print(f'------ TOO FEW COMMON HVGs with n_top_genes={n_top_genes}. Incrementing. ------')
+            n_top_genes += 3000
+            get_common(hvgs, n_top_genes)
+        
+        print(f'Found {len(common_hvgs)} common HVGs with n_top_genes={n_top_genes}')
+        return common_hvgs
+
+    common_hvgs = get_common(hvgs, n_top_genes)
+
     # keep only common HVGs
     for label in list(datasets.keys()):
         l = f'common_hvgs'
         datasets[label].uns[l] = datasets[label][:, common_hvgs].copy()
-        print('Writing common hvgs to datset for {label}.')
+        print(f'Writing common hvgs to datset for {label}.')
         print(datasets[label].uns[l])
+
+    return True
 
 def pseudobulk(datasets: dict) -> None:
     # Perform pseudobulk by test subject and high res celltype
