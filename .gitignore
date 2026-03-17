@@ -1,2 +1,4 @@
-Vasculature_cells.h5ad
-Immune_cells.h5ad
+*.h5ad
+*.log
+*.err
+*.out
