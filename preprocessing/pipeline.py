@@ -10,16 +10,48 @@ def pipeline(
         min_cells:int,
         min_common_hvgs:int,
         common_hvg_inc_value:int,  
-        draw_umaps: bool
+        draw_umaps: bool,
+        shared_dir_mode: bool
         ) -> None:
     
-    ### To read from and write to current users folders
-    user = os.environ.get('USER') or os.environ.get('USERNAME')
-    base_path = Path("/data/users") / user / "kand/data/"
+    if shared_dir_mode:
+        # To read from and write to the shared folder
+        base_path = Path("/data/shared/alzgene26/data")
+    else:
+        ### To read from and write to current users folders
+        #user = os.environ.get('USER') or os.environ.get('USERNAME')
+        #base_path = Path("/data/users") / user / "kand/data/"
+        pass
     
-    # To read from and write to the shared folder
-    #base_path = Path("/data/shared/alzgene26/data")
+    processed_data = "processed_data"
+    run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{min_common_hvgs}' 
+
+    conv_data_path          = base_path / "conv_data"
+    gene_expr_count_path    = base_path / processed_data / "expr_counts"
+    genes_keep_path         = base_path / processed_data / "filter_genes"
+    hvg_lists_path          = base_path / processed_data / "hvg_lists"
+    hvg_common_path         = base_path / processed_data / "hvg_common"
+    figures_path            = base_path / "figures"
+    metadata_path           = base_path / "supplementary_data"
+    completed_path          = base_path / processed_data / "completed" / run_vars
+
+    # create folders if they do not exist
+    gene_expr_count_path.mkdir(parents=True, exist_ok=True)
+    genes_keep_path.mkdir(parents=True, exist_ok=True)
+    hvg_lists_path.mkdir(parents=True, exist_ok=True)
+    hvg_common_path.mkdir(parents=True, exist_ok=True)
+    figures_path.mkdir(parents=True, exist_ok=True)
+    completed_path.mkdir(parents=True, exist_ok=True)
     
+    conv_data_path           = str(conv_data_path)
+    gene_expr_count_path    = str(gene_expr_count_path)
+    genes_keep_path         = str(genes_keep_path)
+    hvg_lists_path          = str(hvg_lists_path)
+    hvg_common_path         = str(hvg_common_path)
+    figures_path            = str(figures_path)
+    metadata_path           = str(metadata_path)
+    completed_path          = str(completed_path)
+
     filepath = str(base_path)
 
     # from int to readable labels
@@ -29,29 +61,33 @@ def pipeline(
     datasets = get_datasets(included_labels)
 
     # read h5ad files, add to datasets dict
-    read_files(datasets, filepath)
+    read_files(datasets, conv_data_path)
 
     #-------FILTERING PREP FOR PER GENE FILTERING-------
     
     for label, adata in datasets.items():
-        f = os.path.join(filepath, f'processed_data/expr_counts/{label}.csv')
+        f = os.path.join(gene_expr_count_path, f'{label}.csv')
         if not Path(f).exists():
             # writes gene expression count per dataset to .csv
             d = {label:adata}
-            write_gene_expr_count(d, filepath)
+            write_gene_expr_count(d, gene_expr_count_path)
 
-    f = os.path.join(filepath, f'genes_to_keep_{min_cells}.csv')
+    f = os.path.join(genes_keep_path, f'genes_to_keep_{min_cells}.csv')
     if not Path(f).exists():
         # sum gene expression counts for all datasets, 
         # list all genes that are expressed in more than min_cells in .csv
-        sum_gene_expr_counts(datasets, filepath, min_cells)
+        sum_gene_expr_counts(
+            datasets, 
+            gene_expr_count_path, 
+            genes_keep_path, 
+            min_cells)
 
     #-------PERFORM FILTERING-------
     # filter bad cells
     filter_cells(datasets, min_genes=200)
 
     # filter lowly expressed genes
-    filter_genes(datasets, filepath, min_cells)
+    filter_genes(datasets, genes_keep_path, min_cells)
 
     #-------FIND AND FILTER HVGs-------
     
@@ -59,24 +95,31 @@ def pipeline(
     # genes sorted from most to least variable
     # this method does not require normalized data
     for label, adata in datasets.items():
-        f = os.path.join(filepath, f'processed_data/hvg_lists/{label}.txt')
+        f = os.path.join(hvg_lists_path, f'{label}.txt')
         if not Path(f).exists():
             d = {label:adata}
-            extract_hvgs_full_list(d, filepath)
+            extract_hvgs_full_list(d, hvg_lists_path)
 
     # find common hvgs from txt files
     included = "_".join(datasets.keys())
     hvg_file = f'{included}_common_{min_common_hvgs}.txt'
-    f = os.path.join(f'{filepath}/hvg_common', hvg_file)
+    f = os.path.join(hvg_common_path, hvg_file)
     
     if not Path(f).exists():
-        find_common_hvgs(datasets, filepath, n_top_genes, min_common_hvgs, common_hvg_inc_value)
+        find_common_hvgs(
+            datasets, 
+            hvg_lists_path, 
+            hvg_common_path, 
+            n_top_genes, 
+            min_common_hvgs, 
+            common_hvg_inc_value
+            )
 
     # filter by common hvgs
     # requires a file with all included cell types in the file name, 
     # and the min nr of common HVGs to include
     # e.g. astro_immune_common_1000.txt
-    filter_common_hvgs(datasets, filepath, hvg_file)
+    filter_common_hvgs(datasets, hvg_common_path, hvg_file)
 
     #-------PSEUDOBULK AND NORMALIZE-------
 
@@ -89,12 +132,13 @@ def pipeline(
     #-------ADD METADATA-------
 
     # add disease status
-    add_metadata(datasets, filepath)
+    add_metadata(datasets, metadata_path)
 
-    save_files(datasets, filepath, 'pseudo')
+    save_files(datasets, completed_path, 'completed')
 
     # visualize how the preprocessing has improved (?) 
-    # separation of cells (slow!!)
+    # separation of cells (slow and uses a lot of memory!!)
+    # for this one it is better to load each data set separately
     if draw_umaps: draw_umaps(datasets)
 
     print('Pipeline completed')
@@ -160,6 +204,14 @@ if __name__ == "__main__":
         help="Visualize cell sparation. Defualt is False"
     )
 
+    # Optional argument
+    parser.add_argument(
+        "--shared_dir_mode", 
+        type=bool,
+        default=True,
+        help="Directory to work in: shared = True, user = False. Default is True."
+    )
+
     args = parser.parse_args()
 
     to_include = args.to_include
@@ -169,6 +221,7 @@ if __name__ == "__main__":
     draw_umaps = args.draw_umaps
     min_common_hvgs = args.min_common_hvgs
     common_hvg_inc_value = args.common_hvg_inc_value
+    shared_dir_mode = args.shared_dir_mode
 
     pipeline(
         to_include, 
@@ -177,5 +230,6 @@ if __name__ == "__main__":
         min_cells=min_cells, 
         min_common_hvgs=min_common_hvgs, 
         common_hvg_inc_value=common_hvg_inc_value, 
-        draw_umaps=draw_umaps
+        draw_umaps=draw_umaps,
+        shared_dir_mode = shared_dir_mode
         )
