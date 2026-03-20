@@ -21,8 +21,6 @@ def get_labels(to_include: list) -> list:
     return included_labels
 
 def get_datasets(included_labels: list) -> dict:
-    # inner dict holds the original data, hvg subset, and pseudobatched data
-    # keeping all of them helps us compare them later to see the effects of pre-processing
     datasets = {
         label: None 
         for label in included_labels
@@ -351,8 +349,8 @@ def normalize(datasets: dict) -> None:
 
 def draw_umaps(datasets: dict, filepath: str) -> None:
     
-    for label in list(datasets.keys()):
-        adata = datasets[label]
+    for label, adata in datasets.items():
+        adata = adata.X
         adata_proc = datasets[label].uns['pseudo']
         print(f'Drawing umaps for {label}')
         
