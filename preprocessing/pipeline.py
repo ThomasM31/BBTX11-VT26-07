@@ -31,20 +31,73 @@ def pipeline(
     # read h5ad files, add to datasets dict
     read_files(datasets, filepath)
 
+    #-------FILTERING PREP FOR PER GENE FILTERING-------
+    
+    for label, adata in datasets.items():
+        f = os.path.join(filepath, f'processed_data/expr_counts/{label}.csv')
+        if not Path(f).exists():
+            # writes gene expression count per dataset to .csv
+            d = {label:adata}
+            write_gene_expr_count(d, filepath)
+
+    f = os.path.join(filepath, f'genes_to_keep_{min_cells}.csv')
+    if not Path(f).exists():
+        # sum gene expression counts for all datasets, 
+        # list all genes that are expressed in more than min_cells in .csv
+        sum_gene_expr_counts(datasets, filepath, min_cells)
+
+    #-------PERFORM FILTERING-------
     # filter bad cells
     filter_cells(datasets, min_genes=200)
 
     # filter lowly expressed genes
-    filter_genes(datasets, min_cells=200)
+    filter_genes(datasets, filepath, min_cells)
 
+    #-------FIND AND FILTER HVGs-------
+    
     # make one .txt file for each cell type with 
     # genes sorted from most to least variable
     # this method does not require normalized data
-    extract_hvgs_full_list(datasets, filepath)
+    for label, adata in datasets.items():
+        f = os.path.join(filepath, f'processed_data/hvg_lists/{label}.txt')
+        if not Path(f).exists():
+            d = {label:adata}
+            extract_hvgs_full_list(d, filepath)
 
-    save_files(datasets, filepath, 'hvg')
+    # find common hvgs from txt files
+    included = "_".join(datasets.keys())
+    hvg_file = f'{included}_common_{min_common_hvgs}.txt'
+    f = os.path.join(f'{filepath}/hvg_common', hvg_file)
+    
+    if not Path(f).exists():
+        find_common_hvgs(datasets, filepath, n_top_genes, min_common_hvgs, common_hvg_inc_value)
 
-    print('HVG extraction pipeline completed')
+    # filter by common hvgs
+    # requires a file with all included cell types in the file name, 
+    # and the min nr of common HVGs to include
+    # e.g. astro_immune_common_1000.txt
+    filter_common_hvgs(datasets, filepath, hvg_file)
+
+    #-------PSEUDOBULK AND NORMALIZE-------
+
+    # sum counts per subject and high res cell type
+    pseudobulk(datasets)
+    
+    #  normalize per pseudobulk sample
+    normalize(datasets)
+
+    #-------ADD METADATA-------
+
+    # add disease status
+    add_metadata(datasets, filepath)
+
+    save_files(datasets, filepath, 'pseudo')
+
+    # visualize how the preprocessing has improved (?) 
+    # separation of cells (slow!!)
+    if draw_umaps: draw_umaps(datasets)
+
+    print('Pipeline completed')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
