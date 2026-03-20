@@ -84,8 +84,59 @@ def filter_cells(datasets: dict, min_genes: int=200) -> None:
 
         print(f"{label}: {old_cells} -> {adata.n_obs} cells (removed {old_cells - adata.n_obs})")
 
+def write_gene_expr_count(datasets: dict, filepath: str):
 
-def filter_genes(datasets: dict, min_cells: int=200) -> None:
+    for label, adata in datasets.items():
+        # counts how many cells expresses each gene
+        sc.pp.filter_genes(adata, min_cells=0)
+        counts = adata.var['n_cells'].tolist()
+
+        to = os.path.join(filepath, f'processed_data/expr_counts/{label}.csv')
+        adata.var['n_cells'].to_csv(to)
+
+def read_gene_expr_count(datasets: dict, filepath: str):
+    
+    p = os.path.join(filepath, 'processed_data/expr_counts')
+
+    files = [f.name for f in Path(p).iterdir() if f.is_file()]
+    
+    # correct cell type for this run
+    rel_files = []
+    for label in datasets.keys():
+        for file in files:
+            is_correct_label = file.startswith(label)
+            
+            if is_correct_label:
+                rel_files.append(file)
+    
+    counts_list = []
+
+    for i, file in enumerate(rel_files):
+        to_read = os.path.join(p, file)
+        counts = pd.read_csv(to_read, index_col=0).iloc[:, 0]
+        counts_list.append(counts)
+        
+    return counts_list
+
+def sum_gene_expr_counts(datasets, filepath, min_cells):
+    '''
+    Sum the number of cell where each gene is expressed for all data sets.
+    Writes a file of all genes expressed in at least 'min_cells' cells.
+    '''
+    counts_list = read_gene_expr_count(datasets, filepath)
+
+    # sum counts and list all that are expressed in more than at least min_cells
+    total_counts = pd.concat(counts_list, axis = 1).sum(axis = 1)
+    genes_to_keep = total_counts[total_counts >= min_cells].index
+
+    to = os.path.join(
+        f'{filepath}/processed_data/filter_genes', 
+        f'genes_to_keep_{min_cells}.csv')
+        
+    pd.Series(genes_to_keep, name='gene_ids').to_csv(to, index=False)
+
+
+def filter_genes(datasets: dict, filepath: str, min_cells: int=200) -> None:
     '''
     Filter genes that appear in less than 'min_cells' cells cumulatively 
     for all data sets.
@@ -94,18 +145,10 @@ def filter_genes(datasets: dict, min_cells: int=200) -> None:
     but may be highly expressed in another.
     '''
     print(f'Filtering out genes expressed in <{min_cells} cells.')
-    
-    # keeps cell count for every gene
-    counts_list = []
 
-    for label, adata in datasets.items():
-        # counts how many cells expresses each gene and add to counts_list
-        sc.pp.filter_genes(adata, min_cells=0)
-        counts_list.append(adata.var['n_cells'])
-
-    # sum counts and list all that are expressed in more than at least min_cells
-    total_counts = pd.concat(counts_list, axis = 1).sum(axis = 1)
-    genes_to_keep = total_counts[total_counts >= min_cells].index
+    to_read = os.path.join(filepath, f'processed_data/filter_genes/genes_to_keep_{min_cells}.csv')
+    genes_to_keep = pd.read_csv(to_read)
+    genes_to_keep = genes_to_keep['gene_ids'].tolist()
 
     # do the filtering
     for label, adata in datasets.items():
@@ -179,7 +222,7 @@ def extract_hvgs_full_list(datasets: dict, filepath: str):
 
         # save list of hvgs as textfile
         # will allow us to find common hvgs later
-        fname = f'{label}_sorted_by_variability_desc.txt'
+        fname = f'{label}.txt'
         to = os.path.join(filepath, fname)
         with open(to, 'w') as output:
             for gene in sorted_genes:
@@ -203,10 +246,7 @@ def find_common_hvgs(
     rel_files = []
     for label in datasets.keys():
         for file in files:
-            is_hvgs_descending = file.endswith('desc.txt')
-            is_correct_label = file.startswith(label)
-
-            if is_hvgs_descending and is_correct_label:
+            if file.startswith(label):
                 rel_files.append(file)
     
     hvgs = []  
@@ -216,35 +256,45 @@ def find_common_hvgs(
             genes = input.readlines()
             hvgs.append([g.strip('\n') for g in genes])
 
-    def get_common(hvgs: list, n_top_genes: int) -> list:
-        # find the genes that are HVGs for all datasets (intersection)
-        common_hvgs = set(hvgs[0][0:n_top_genes])
-        for i, hvg in enumerate(hvgs):
-            common_hvgs = common_hvgs & set(hvgs[i][0:n_top_genes])
-        common_hvgs = list(common_hvgs)
+    # remove any genes that have already been filtered out
+    for i, label in enumerate(datasets.keys()):
+        hvgs[i] = [g for g in hvgs[i] if g in datasets[label].var_names]
 
-        return common_hvgs
+    def get_common(hvgs: list, n_top_genes: int) -> list:
+        common_dict = {g: None for g in hvgs[0][:n_top_genes]}
+
+        for hvg_list in hvgs[1:]:
+            print(f'ntop: {n_top_genes}')
+            current_top = set(hvg_list[:n_top_genes])
+            common_dict = {g: None for g in common_dict if g in current_top}
+
+        return list(common_dict.keys())
 
     common_hvgs = []
     n = n_top_genes
+    # run the get_common with larger numbers of variables, 
+    # until we get a a value that is at least min_common
     while len(common_hvgs) < min_common:
         common_hvgs = get_common(hvgs, n)
         n += inc_val
+
+    # just take the min_common most variable
+    common_hvgs = common_hvgs[:min_common]
 
     print(f'Found {len(common_hvgs)} common HVGs with n_top_genes={n}')
     
     included = "_".join(datasets.keys())
 
     # create text file of all common HVGs
-    fname = f'{included}_ntop_{n}_common_{len(common_hvgs)}.txt'
-    to = os.path.join(filepath, fname)
+    fname = f'{included}_common_{len(common_hvgs)}.txt'
+    to = os.path.join(f'{filepath}/processed_data/hvg_common', fname)
     with open(to, 'w') as output:
         for gene in common_hvgs:
             output.write(str(gene) + '\n')
 
     
 def filter_common_hvgs(datasets: dict, filepath: str, hvg_file:str) -> None:
-    p = os.path.join(filepath, 'processed_data/hvg_lists')
+    p = os.path.join(filepath, 'processed_data/hvg_common')
     
     path = os.path.join(p, hvg_file)
     with open(path, 'r') as input:
@@ -253,6 +303,7 @@ def filter_common_hvgs(datasets: dict, filepath: str, hvg_file:str) -> None:
 
     ## save common hvgs in adata object
     for label, adata in datasets.items():
+        common_hvgs = [g for g in common_hvgs if g in adata.var_names]
         adata.uns['common_hvgs'] = adata[:, common_hvgs].copy()
         print(f'Writing common hvgs to datset for {label}.')
         print(adata.uns['common_hvgs'])
@@ -284,10 +335,9 @@ def normalize(datasets: dict) -> None:
         # Normalizes counts per pseudobulk sample
         # There are possible options, e.g. exclude highly expressed genes from computation
 
-        # Using Counts per million
-        sc.pp.normalize_total(adata, exclude_highly_expressed=False, target_sum=1e6)
+        sc.pp.normalize_total(adata, exclude_highly_expressed=False, target_sum=1e4)
 
-        # Especially useful if range is large?
+        # Especially useful if range is large
         sc.pp.log1p(adata)
 
         # Scaling centers genes at 0
@@ -379,6 +429,3 @@ def save_files(datasets: dict, filepath: str, stage:str) -> None:
         datasets[label].write_h5ad(to)
 
     print(f'Writing to file(s) at stage {stage} completed')
-
-
-
