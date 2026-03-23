@@ -11,6 +11,8 @@ from anndata.experimental import AnnCollection
 from anndata.experimental.pytorch import AnnLoader
 ad.settings.allow_write_nullable_strings = True
 
+import scipy.misc
+
 def get_labels(to_include: list) -> list:
     labels = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
     included_labels = [labels[i] for i in to_include]
@@ -19,15 +21,13 @@ def get_labels(to_include: list) -> list:
     return included_labels
 
 def get_datasets(included_labels: list) -> dict:
-    # inner dict holds the original data, hvg subset, and pseudobatched data
-    # keeping all of them helps us compare them later to see the effects of pre-processing
     datasets = {
-        label: {'orig': None, 'subset': None, 'pseudo': None} 
+        label: None 
         for label in included_labels
     }
     return datasets
 
-def read_files(filepath: str, datasets: dict) -> None:
+def read_files(datasets: dict, filepath: str) -> None:
 
     files = {'astro'  : 'Astrocytes.h5ad',
              'exc1'   : 'Excitatory_neurons_set1.h5ad',
@@ -39,20 +39,129 @@ def read_files(filepath: str, datasets: dict) -> None:
              'opcs'   : 'OPCs.h5ad',
              'vasc'   : 'Vasculature_cells.h5ad'}
 
-    p = 'conv_data'
-    p = os.path.join(filepath, p)
+    for label in list(datasets.keys()):
+        print(f'Reading: {label}')
+        f = os.path.join(filepath, files[label])
+        datasets[label] = ad.read_h5ad(f)
+        print(datasets[label])
+
+    return datasets
+
+def read_hvg_adata(datasets: dict, filepath: str) -> None:
+    p = os.path.join(filepath, 'processed_data/hvg')
 
     for label in list(datasets.keys()):
         print(f'Reading: {label}')
-        f = os.path.join(p,files[label])
-        datasets[label]['orig'] = ad.read_h5ad(f)
+        f = os.path.join(p,f'{label}.h5ad')
+        datasets[label] = ad.read_h5ad(f)
+        print(datasets[label])
 
-    return datasets
+def filter_cells(datasets: dict, min_genes: int=200) -> None:
+    for label, adata in datasets.items():
+        print(f'Filtering cells for {label}')
+        old_cells = adata.n_obs
+        
+        print(f'Original nr cells {label}: {old_cells}')
+        
+        print(f"Filtering cells with <{min_genes} genes...")
+        sc.pp.filter_cells(adata, min_genes=min_genes)
+        
+        print(f"Filtered data, shape={adata.shape}\n")
+
+        print("Calculating QC metrics")
+        adata.var["mt"] = np.array(adata.var_names.str.startswith("MT-"), dtype=bool)
+        print("MT genes detected:", adata.var["mt"].sum())
+
+        sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True)
+
+        print("Dropping cells with >5% mitochondrial counts...")
+        datasets[label] = adata[adata.obs.pct_counts_mt < 5, :].copy()
+
+        print(f"{label}: {old_cells} -> {adata.n_obs} cells (removed {old_cells - adata.n_obs})")
+
+def write_gene_expr_count(datasets: dict, filepath: str) -> None:
+
+    for label, adata in datasets.items():
+        # counts how many cells expresses each gene
+        sc.pp.filter_genes(adata, min_cells=0)
+        counts = adata.var['n_cells'].tolist()
+
+        to = os.path.join(filepath, f'{label}.csv')
+        adata.var['n_cells'].to_csv(to)
+
+def read_gene_expr_count(datasets: dict, filepath: str) -> list:
+    
+    files = [f.name for f in Path(filepath).iterdir() if f.is_file()]
+    
+    # correct cell type for this run
+    rel_files = []
+    for label in datasets.keys():
+        for file in files:
+            is_correct_label = file.startswith(label)
+            
+            if is_correct_label:
+                rel_files.append(file)
+    
+    counts_list = []
+
+    for i, file in enumerate(rel_files):
+        to_read = os.path.join(filepath, file)
+        counts = pd.read_csv(to_read, index_col=0).iloc[:, 0]
+        counts_list.append(counts)
+        
+    return counts_list
+
+def sum_gene_expr_counts(
+        datasets: dict, 
+        filepath_from: str, 
+        filepath_to: str, 
+        min_cells: int
+        ) -> None:
+    '''
+    Sum the number of cell where each gene is expressed for all data sets.
+    Writes a file of all genes expressed in at least 'min_cells' cells.
+    '''
+    counts_list = read_gene_expr_count(datasets, filepath_from)
+
+    # sum counts and list all that are expressed in more than at least min_cells
+    total_counts = pd.concat(counts_list, axis = 1).sum(axis = 1)
+    genes_to_keep = total_counts[total_counts >= min_cells].index
+ 
+    to = os.path.join(filepath_to, f'genes_to_keep_{min_cells}.csv')
+        
+    pd.Series(genes_to_keep, name='gene_ids').to_csv(to, index=False)
+
+
+def filter_genes(
+        datasets: dict, 
+        filepath: str, 
+        min_cells: int=200
+        ) -> None:
+    '''
+    Filter genes that appear in less than 'min_cells' cells cumulatively 
+    for all data sets.
+    Doing this over all datasets ensures that we don't accidentally 
+    remove genes that are lowly expressed in some cell type, 
+    but may be highly expressed in another.
+    '''
+    print(f'Filtering out genes expressed in <{min_cells} cells.')
+
+    to_read = os.path.join(filepath, f'genes_to_keep_{min_cells}.csv')
+    genes_to_keep = pd.read_csv(to_read)
+    genes_to_keep = genes_to_keep['gene_ids'].tolist()
+
+    # do the filtering
+    for label, adata in datasets.items():
+        print(f'{label}: removing genes expressed in <{min_cells} cells (cumulative)')
+        old_genes = adata.n_vars
+        datasets[label] = adata[:, adata.var_names.isin(genes_to_keep)].copy()
+        new_genes = datasets[label].n_vars
+        print(f"{label}: {old_genes} -> {new_genes} genes (removed {old_genes - new_genes})")
 
 
 def prep_for_hvg_sel(datasets: dict) -> None:
     for label in list(datasets.keys()):
-        dataset = datasets.get(label)['orig']
+        dataset = datasets[label]
         # need to log normalize, some datasets seem to not be properly normalized in the logcounts layer
         # if we just use the logcounts layer it causes crashes when extracting HVGs
 
@@ -67,35 +176,136 @@ def prep_for_hvg_sel(datasets: dict) -> None:
         print(f'min after: {dataset_log.X.min()}, max after: {dataset_log.X.max():.1f}')
 
 
-def extract_common_hvgs(datasets: dict, n_top_genes: int = 2000) -> None:
+def extract_per_cell_type_hvgs(
+        datasets: dict, 
+        filepath: str, 
+        n_top_genes: int
+        ) -> None:
+    '''
+    Writes n most variable genes to text file, per submitted dataset.
+    '''
+    
     # Keep only highly variable genes (HVGs)
     hvgs = []
 
     # extract HVGs (NOTE: expects normalized data)
     for label in list(datasets.keys()):
-        print(f'Extracting HVGS from "{label}"')
+        print(f'Extracting the {n_top_genes} most variable genes from {label}')
 
         # use log1p layer
-        adata = datasets[label]['orig'].uns['log1p']
+        adata = datasets[label].uns['log1p']
 
-        sc.pp.highly_variable_genes(adata, n_top_genes=2000)
-        g = adata.var_names[adata.var.highly_variable]
-        hvgs.append(g)
+        sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes)
+        hvg_per_type = adata.var_names[adata.var.highly_variable].tolist()
 
-    # find the genes that are HVGs for all datasets
-    common_hvgs = set(hvgs[0])
-    for i in range(1, len(hvgs)):
-        common_hvgs = common_hvgs & set(hvgs[i])
-    common_hvgs = list(common_hvgs)
+        # save list of hvgs as textfile
+        # will allow us to find common hvgs later
+        fname = f'{label}_ntop_{n_top_genes}.txt'
+        to = os.path.join(filepath, fname)
+        with open(to, 'w') as output:
+            for gene in hvg_per_type:
+                output.write(str(gene) + '\n')
 
-    print(f'Nr common hvgs: {len(common_hvgs)}')
+        # save HVGs to dataset
+        datasets[label].uns['hvg'] = datasets[label][:, hvg_per_type].copy()
+        print(f'Writing HVGs for {label}')
+        print(datasets[label].uns['hvg'])
 
-    # keep only HVGs
-    for label in list(datasets.keys()):
-        datasets[label]['subset'] = datasets[label]['orig'][:, common_hvgs].copy()
-        print(f'HVGs for {label}')
-        print(datasets[label]['subset'])
+def extract_hvgs_full_list(datasets: dict, filepath: str):
+    '''
+    Writes all genes to text file in order of descending variability.
+    '''
 
+    for label, adata in datasets.items():
+        # seurat v3 flavor uses raw counts, normalized data not needed
+        sc.pp.highly_variable_genes(adata, flavor='seurat_v3')
+
+        sorted_genes = adata.var.sort_values('variances_norm', ascending=False).index.tolist()
+
+        # save list of hvgs as textfile
+        # will allow us to find common hvgs later
+        fname = f'{label}.txt'
+        to = os.path.join(filepath, fname)
+        with open(to, 'w') as output:
+            for gene in sorted_genes:
+                output.write(str(gene) + '\n')
+
+
+def find_common_hvgs(
+        datasets: dict, 
+        filepath_from: str, 
+        filepath_to: str,  
+        n_top_genes: int, 
+        min_common: int = 1000, 
+        inc_val: int = 3000
+        ) -> None:
+    
+    files = [f.name for f in Path(filepath_from).iterdir() if f.is_file()]
+
+    # retain only files with correct cell type for this run
+    rel_files = []
+    for label in datasets.keys():
+        for file in files:
+            if file.startswith(label):
+                rel_files.append(file)
+    
+    hvgs = []  
+    for i, file in enumerate(rel_files):
+        path = os.path.join(filepath_from, file)
+        with open(path, 'r') as input:
+            genes = input.readlines()
+            hvgs.append([g.strip('\n') for g in genes])
+
+    # remove any genes that have already been filtered out
+    for i, label in enumerate(datasets.keys()):
+        hvgs[i] = [g for g in hvgs[i] if g in datasets[label].var_names]
+
+    def get_common(hvgs: list, n_top_genes: int) -> list:
+        common_dict = {g: None for g in hvgs[0][:n_top_genes]}
+
+        for hvg_list in hvgs[1:]:
+            print(f'ntop: {n_top_genes}')
+            current_top = set(hvg_list[:n_top_genes])
+            common_dict = {g: None for g in common_dict if g in current_top}
+
+        return list(common_dict.keys())
+
+    common_hvgs = []
+    n = n_top_genes
+    # run the get_common with larger numbers of variables, 
+    # until we get a a value that is at least min_common
+    while len(common_hvgs) < min_common:
+        common_hvgs = get_common(hvgs, n)
+        n += inc_val
+
+    # just take the min_common most variable
+    common_hvgs = common_hvgs[:min_common]
+
+    print(f'Found {len(common_hvgs)} common HVGs with n_top_genes={n}')
+    
+    included = "_".join(datasets.keys())
+
+    # create text file of all common HVGs
+    fname = f'{included}_common_{len(common_hvgs)}.txt'
+    to = os.path.join(filepath_to, fname)
+    with open(to, 'w') as output:
+        for gene in common_hvgs:
+            output.write(str(gene) + '\n')
+
+    
+def filter_common_hvgs(datasets: dict, filepath: str, hvg_file:str) -> None:
+    
+    path = os.path.join(filepath, hvg_file)
+    with open(path, 'r') as input:
+        genes = input.readlines()
+        common_hvgs = [g.strip('\n') for g in genes]
+
+    ## save common hvgs in adata object
+    for label, adata in datasets.items():
+        common_hvgs = [g for g in common_hvgs if g in adata.var_names]
+        adata.uns['common_hvgs'] = adata[:, common_hvgs].copy()
+        print(f'Writing common hvgs to datset for {label}.')
+        print(adata.uns['common_hvgs'])
 
 def pseudobulk(datasets: dict) -> None:
     # Perform pseudobulk by test subject and high res celltype
@@ -104,29 +314,29 @@ def pseudobulk(datasets: dict) -> None:
         print(f'Pseudobulking "{label}"')
 
         pseudo = sc.get.aggregate(
-            datasets[label]['subset'], 
+            datasets[label].uns['common_hvgs'], 
             by=['subject', 'cell_type_high_resolution'], 
             func='sum'
             )
 
         # moves pseudobulk to the main layer
         pseudo.X = pseudo.layers['sum'].copy()
-        datasets[label]['pseudo'] = pseudo
+        datasets[label].uns['pseudo'] = pseudo
+        print(datasets[label].uns['pseudo'])
 
 
 def normalize(datasets: dict) -> None:
     for label in list(datasets.keys()):
         print(f'Normalizing: "{label}"')
         
-        adata = datasets[label]['pseudo']
+        adata = datasets[label].uns['pseudo']
 
         # Normalizes counts per pseudobulk sample
         # There are possible options, e.g. exclude highly expressed genes from computation
 
-        # Using Counts per million
-        sc.pp.normalize_total(adata, exclude_highly_expressed=False, target_sum=1e6)
+        sc.pp.normalize_total(adata, exclude_highly_expressed=False, target_sum=1e4)
 
-        # Especially useful if range is large?
+        # Especially useful if range is large
         sc.pp.log1p(adata)
 
         # Scaling centers genes at 0
@@ -137,22 +347,17 @@ def normalize(datasets: dict) -> None:
         print(f'{label:<8} has min: {adata.X.min():.2f} and max: {adata.X.max():.2f}')
 
 
-def draw_umaps(datasets: dict) -> None:
-    user = os.environ.get('USER') or os.environ.get('USERNAME')
-    fig_path = Path("/data/users") / user / "kand/data/figures/"
-    # create the path if it doesn't exist
-    fig_path.mkdir(parents=True, exist_ok=True)
-    fig_path = str(fig_path)
+def draw_umaps(datasets: dict, filepath: str) -> None:
     
-    for label in list(datasets.keys()):
-        adata = datasets[label]['orig']
-        adata_proc = datasets[label]['pseudo']
+    for label, adata in datasets.items():
+        adata = adata.X
+        adata_proc = datasets[label].uns['pseudo']
         print(f'Drawing umaps for {label}')
         
         fname1 = f'{label}_orig'
-        fname1 = os.path.join(fig_path,fname1)
+        fname1 = os.path.join(filepath,fname1)
         fname2 = f'{label}_proc'
-        fname2 = os.path.join(fig_path,fname2)
+        fname2 = os.path.join(filepath,fname2)
 
         # UMAP for original
         sc.tl.pca(adata, svd_solver='arpack')
@@ -172,15 +377,13 @@ def draw_umaps(datasets: dict) -> None:
                    color=['cell_type_high_resolution'], 
                    show=False).figure.savefig(fname2)
         
-        print("Drawing completed")
+        print(f"Drawing completed for {label}")
 
 
 def add_metadata(datasets: dict, filepath: str, is_float=True) -> None:
     # Add subject disease status metadata
-    directory = 'supplementary_data/'
     file = 'individual_metadata_deidentified.tsv'
-    p = os.path.join(filepath,directory,file)
-
+    p = os.path.join(filepath,file)
     metadata = pd.read_csv(p,sep='\t')
 
     AD_status_lbl = 'Pathologic_diagnosis_of_AD'
@@ -199,66 +402,20 @@ def add_metadata(datasets: dict, filepath: str, is_float=True) -> None:
     status_map = dict(zip(md_sel['subject'], md_sel[AD_status_lbl]))
 
     for label in list(datasets.keys()):
-        pseudo = datasets[label]['pseudo']
+        pseudo = datasets[label].uns['pseudo']
         subjects = pseudo.obs['subject'].astype(str).values
 
         pseudo.obs['AD_status'] = [str(status_map.get(s)) for s in subjects]
         pseudo.obs['AD_status'] = pseudo.obs['AD_status'].astype('category')
 
 
-def save_files(datasets: dict, filepath: str) -> None:
-    # Save pseudobatched data
+def save_files(datasets: dict, filepath: str, stage:str) -> None:
+    print(f'Writing files at stage "{stage}"')
+    
     for label in list(datasets.keys()):
         print(f'Writing "{label}" to file.')
-        p = os.path.join(filepath, 'processed_data/')
-        f = label + '.h5ad'
-        to = os.path.join(p,f)
+        to = os.path.join(filepath, f'{label}.h5ad')
 
-        datasets[label]['pseudo'].write_h5ad(to)
+        datasets[label].write_h5ad(to)
 
-    print('Writing to file(s) completed')
-
-
-def pipeline(to_include: list):
-    ### To read from and write to current users folders
-    user = os.environ.get('USER') or os.environ.get('USERNAME')
-    base_path = Path("/data/users") / user / "kand/data/"
-    filepath = str(base_path)
-
-    included_labels = get_labels(to_include)
-
-    datasets = get_datasets(included_labels)
-
-    read_files(filepath, datasets)
-
-    prep_for_hvg_sel(datasets)
-
-    extract_common_hvgs(datasets, n_top_genes=2000)
-
-    pseudobulk(datasets)
-    
-    normalize(datasets)
-
-    add_metadata(datasets, filepath)
-
-    save_files(datasets, filepath)
-
-    draw_umaps(datasets)
-
-    print('Pipeline completed')
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description = "Pre-process anndata objects and save as .h5ad"
-    )
-
-    parser.add_argument(
-        "to_include",
-        help="indices to include: \n0=astro \n1=exc1 \n2=exc2 \n3=exc3 \n4=immune \n5=inhi \n6=oligo \n7=opcs \n8=vasc",
-        nargs='+')
-
-    args = parser.parse_args()
-    to_include = [int(arg) for arg in args.to_include]
-
-    pipeline(to_include)
-
+    print(f'Writing to file(s) at stage {stage} done!')
