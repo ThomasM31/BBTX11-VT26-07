@@ -60,6 +60,8 @@ def train_loader(in_features,layer_list,mask_list,training_epochs):
     epochs=training_epochs
     losses=[]
 
+
+    # Losses
     for i in range(epochs):
         y_pred=binn.forward(X_train) # Predicts y with training data
         loss=criterion(y_pred,y_train) # Measures loss by comparing predicted vs training y data
@@ -71,5 +73,17 @@ def train_loader(in_features,layer_list,mask_list,training_epochs):
 
         optimizer.zero_grad() # Clears gradients
         loss.backward() # backward is a method from torch that computes the gradients for tensors 
-        optimizer.step() # Uses the gradients from backward and updates 
+        optimizer.step() # Uses the gradients from backward and updates weights. This is were binn is learning
+    
+
+    with torch.no_grad(): # Do not need to store gradients anymore
+        logits = binn.forward(X_test) # Go through the neural network with the updated trained weights 
+        probs = torch.sigmoid(logits) # Turn logits intp probabilities
+
+        for i, p in enumerate(probs):
+            print(f"{i+1}.) Probability: {p.item():.4f}") # Print the probabilities
+
+
+
+
 
