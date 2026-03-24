@@ -25,7 +25,7 @@ def xy_datasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
 
 
 
-def train_loader(in_features,layer_list,mask_list,training_epochs):
+def train_loader(train_adata,test_adata,    in_features,layer_list,mask_list,training_epochs):
 
     binn=BINN(in_features,layer_list,mask_list)
 
@@ -82,8 +82,3 @@ def train_loader(in_features,layer_list,mask_list,training_epochs):
 
         for i, p in enumerate(probs):
             print(f"{i+1}.) Probability: {p.item():.4f}") # Print the probabilities
-
-
-
-
-
