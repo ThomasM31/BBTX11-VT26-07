@@ -12,7 +12,6 @@ mask_list=[] # List of binary tensors (binary matrices) that restricts each laye
 binn=BINN(in_features,layer_list,mask_list)
 
 ############################################################
-
 # Copied from Thomas baselinemodel.py  
 
 def read_adata(indices: list, train_size=0.8):

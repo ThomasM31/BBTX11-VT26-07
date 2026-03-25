@@ -350,7 +350,7 @@ def normalize(datasets: dict) -> None:
 def draw_umaps(datasets: dict, filepath: str) -> None:
     
     for label, adata in datasets.items():
-        adata = adata.X
+        adata_orig = datasets[label]
         adata_proc = datasets[label].uns['pseudo']
         print(f'Drawing umaps for {label}')
         
@@ -360,13 +360,14 @@ def draw_umaps(datasets: dict, filepath: str) -> None:
         fname2 = os.path.join(filepath,fname2)
 
         # UMAP for original
-        sc.tl.pca(adata, svd_solver='arpack')
-        sc.pp.neighbors(adata, n_neighbors=20, n_pcs = 30)
-        sc.tl.umap(adata)
-        sc.pl.umap(adata, 
+        sc.tl.pca(adata_orig, svd_solver='arpack')
+        sc.pp.neighbors(adata_orig, n_neighbors=20, n_pcs = 30)
+        sc.tl.umap(adata_orig)
+        sc.pl.umap(adata_orig, 
                    title=f"{label} original",
                    color=['cell_type_high_resolution'], 
-                   show=False).figure.savefig(fname1)
+                   show=False,
+                   legend_loc="upper left").figure.savefig(fname1)
 
         # UMAP for preprocessed
         sc.tl.pca(adata_proc, svd_solver='arpack')
@@ -375,7 +376,8 @@ def draw_umaps(datasets: dict, filepath: str) -> None:
         sc.pl.umap(adata_proc, 
                    title=f"{label} pre-processed",
                    color=['cell_type_high_resolution'], 
-                   show=False).figure.savefig(fname2)
+                   show=False,
+                   legend_loc="upper left").figure.savefig(fname2)
         
         print(f"Drawing completed for {label}")
 

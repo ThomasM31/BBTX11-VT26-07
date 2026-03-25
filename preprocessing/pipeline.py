@@ -1,4 +1,4 @@
-from preprocess import *
+import preprocess as pre
 import argparse
 import os
 from pathlib import Path
@@ -55,13 +55,13 @@ def pipeline(
     filepath = str(base_path)
 
     # from int to readable labels
-    included_labels = get_labels(to_include)
+    included_labels = pre.get_labels(to_include)
 
     # create empty dict
-    datasets = get_datasets(included_labels)
+    datasets = pre.get_datasets(included_labels)
 
     # read h5ad files, add to datasets dict
-    read_files(datasets, conv_data_path)
+    pre.read_files(datasets, conv_data_path)
 
     #-------FILTERING PREP FOR PER GENE FILTERING-------
     
@@ -70,13 +70,13 @@ def pipeline(
         if not Path(f).exists():
             # writes gene expression count per dataset to .csv
             d = {label:adata}
-            write_gene_expr_count(d, gene_expr_count_path)
+            pre.write_gene_expr_count(d, gene_expr_count_path)
 
     f = os.path.join(genes_keep_path, f'genes_to_keep_{min_cells}.csv')
     if not Path(f).exists():
         # sum gene expression counts for all datasets, 
         # list all genes that are expressed in more than min_cells in .csv
-        sum_gene_expr_counts(
+        pre.sum_gene_expr_counts(
             datasets, 
             gene_expr_count_path, 
             genes_keep_path, 
@@ -84,10 +84,10 @@ def pipeline(
 
     #-------PERFORM FILTERING-------
     # filter bad cells
-    filter_cells(datasets, min_genes=200)
+    pre.filter_cells(datasets, min_genes=200)
 
     # filter lowly expressed genes
-    filter_genes(datasets, genes_keep_path, min_cells)
+    pre.filter_genes(datasets, genes_keep_path, min_cells)
 
     #-------FIND AND FILTER HVGs-------
     
@@ -98,7 +98,7 @@ def pipeline(
         f = os.path.join(hvg_lists_path, f'{label}.txt')
         if not Path(f).exists():
             d = {label:adata}
-            extract_hvgs_full_list(d, hvg_lists_path)
+            pre.extract_hvgs_full_list(d, hvg_lists_path)
 
     # find common hvgs from txt files
     included = "_".join(datasets.keys())
@@ -106,7 +106,7 @@ def pipeline(
     f = os.path.join(hvg_common_path, hvg_file)
     
     if not Path(f).exists():
-        find_common_hvgs(
+        pre.find_common_hvgs(
             datasets, 
             hvg_lists_path, 
             hvg_common_path, 
@@ -119,27 +119,27 @@ def pipeline(
     # requires a file with all included cell types in the file name, 
     # and the min nr of common HVGs to include
     # e.g. astro_immune_common_1000.txt
-    filter_common_hvgs(datasets, hvg_common_path, hvg_file)
+    pre.filter_common_hvgs(datasets, hvg_common_path, hvg_file)
 
     #-------PSEUDOBULK AND NORMALIZE-------
 
     # sum counts per subject and high res cell type
-    pseudobulk(datasets)
+    pre.pseudobulk(datasets)
     
     #  normalize per pseudobulk sample
-    normalize(datasets)
+    pre.normalize(datasets)
 
     #-------ADD METADATA-------
 
     # add disease status
-    add_metadata(datasets, metadata_path)
+    pre.add_metadata(datasets, metadata_path)
 
-    save_files(datasets, completed_path, 'completed')
+    pre.save_files(datasets, completed_path, 'completed')
 
     # visualize how the preprocessing has improved (?) 
     # separation of cells (slow and uses a lot of memory!!)
     # for this one it is better to load each data set separately
-    if draw_umaps: draw_umaps(datasets)
+    if draw_umaps: pre.draw_umaps(datasets=datasets, filepath=figures_path)
 
     print('Pipeline completed')
 
