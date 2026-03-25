@@ -366,7 +366,8 @@ def draw_umaps(datasets: dict, filepath: str) -> None:
         sc.pl.umap(adata_orig, 
                    title=f"{label} original",
                    color=['cell_type_high_resolution'], 
-                   show=False).figure.savefig(fname1)
+                   show=False,
+                   legend_loc="upper left").figure.savefig(fname1)
 
         # UMAP for preprocessed
         sc.tl.pca(adata_proc, svd_solver='arpack')
@@ -375,7 +376,8 @@ def draw_umaps(datasets: dict, filepath: str) -> None:
         sc.pl.umap(adata_proc, 
                    title=f"{label} pre-processed",
                    color=['cell_type_high_resolution'], 
-                   show=False).figure.savefig(fname2)
+                   show=False,
+                   legend_loc="upper left").figure.savefig(fname2)
         
         print(f"Drawing completed for {label}")
 
