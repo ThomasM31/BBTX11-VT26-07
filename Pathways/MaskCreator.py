@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 from collections import defaultdict
+import argparse
+from pathlib import Path
 
 # Internal helper functions
 
@@ -323,12 +325,11 @@ class PathwayNetwork:
         return matrices
 
 
-# Paths:
-INPUT_DIR = '/data/shared/alzgene26/data/conv_data/'
-OUTPUT_DIR = '/data/shared/alzgene26/PathwayData/MaskMatrixLayers'
+# Path to file with description of gene-pathway connections and
+# pathway-pathway connections
 CONNECTIVITY_FILE = '/data/shared/alzgene26/PathwayData/binn_connectivity.csv'
 
-def main():
+def main(INPUT_DIR: str, OUTPUT_DIR:str, several_datasets: bool):
     print("=== STARTING FULL MASK GENERATION ===")
     
     # Read the network connectivities
@@ -355,7 +356,7 @@ def main():
     cell_files = [f for f in os.listdir(INPUT_DIR) if f.endswith('.h5ad')]
     print(f"Found {len(cell_files)} cell types to process.\n")
 
-    for file_name in cell_files:
+    def _do_mask_creation(file_name: str, save_str: str, data_info: str) -> None:
         cell_name = file_name.removesuffix('.h5ad')
         print(f">>> Processing: {cell_name}")
         
@@ -374,16 +375,62 @@ def main():
             # Generate matrixes NOTE: (4 layers, change later?)
             matrices = pn.get_connectivity_matrices(n_layers=4)
             
-            # Save every matrix with the name of the cell type and layer in network
+            out_path_with_info = os.path.join(OUTPUT_DIR, data_info)
             for i, m in enumerate(matrices):
-                out_path = os.path.join(OUTPUT_DIR, f"{cell_name}_layer_{i}_mask.csv")
+                if save_str == '':
+                    out_path = Path(os.path.join(out_path_with_info, f"{cell_name}_layer_{i}_mask.csv"))
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                else:
+                    out_path = Path(os.path.join(out_path_with_info, f"{save_str}_layer_{i}_mask.csv"))
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
                 m.to_csv(out_path)
                 print(f"      Saved: {out_path} (Shape: {m.shape})")
                 
         except Exception as e:
             print(f"      [ERROR] could not process {cell_name}: {e}")
-            
-    print("\n=== ALL CELL TYPES PROCESSED ===")
+    
+    data_info = INPUT_DIR.split('/')[-1]
+    if several_datasets:
+        for file_name in cell_files:
+            _do_mask_creation(file_name, '', data_info)
+            print("\n=== ALL CELL TYPES PROCESSED ===")
+    else:
+        # process only first file (as gene set is same for all files)
+        cell_files_stripped = [c.removesuffix('.h5ad') for c in cell_files]
+        save_str = "_".join(cell_files_stripped)
+        _do_mask_creation(cell_files[0], save_str, data_info)
+
+    
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description = "Pre-process anndata objects and save as .h5ad"
+    )
+
+    parser.add_argument(
+        "filepath_in", 
+        type=str,
+        help="Filepath to read from"
+    )
+
+    parser.add_argument(
+        "filepath_out", 
+        type=str,
+        help="Filepath to output masks to"
+    )
+
+    # Optional argument
+    parser.add_argument(
+        "--several_datasets", 
+        type=bool,
+        default=False,
+        help="If True prepares mask matrixes for all files in a folder (if gene set is different for files / cell types)"
+    )
+
+    args = parser.parse_args()
+
+    filepath_in = args.filepath_in
+    filepath_out = args.filepath_out
+    several_datasets = args.several_datasets
+
+    main(filepath_in, filepath_out, several_datasets)
