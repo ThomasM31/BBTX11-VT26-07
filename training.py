@@ -2,7 +2,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from binn import BINN
+
+# BINN 
+from BINN.model import BINN
+from BINN.trainer import train_binn, test_binn
+
 from preprocessing import custom_train_test_split_modified
 import anndata as ad
 
