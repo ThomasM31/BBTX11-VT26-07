@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from binn import BINN
 from preprocessing import custom_train_test_split_modified
+import anndata as ad
 
 in_features=99999# Integers of how many genes we have as input
 layer_list=[] # List of integers, which describes how many layers and how many nodes each layer has

@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from binn import BINN
 from preprocessing import custom_train_test_split_modified
+import anndata as ad
 
 ############################################################
 
