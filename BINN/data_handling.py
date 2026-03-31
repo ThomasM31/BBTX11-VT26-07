@@ -1,9 +1,4 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-import numpy as np
-import scipy.sparse as sp
 from preprocessing import custom_train_test_split
 import anndata as ad
 import SingleCellDataset
@@ -12,7 +7,7 @@ ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
     
 def read_adata(indices: list, train_size=0.8):
     """
-    
+
     """
     train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, train_size)
     return train_adata, test_adata, acollection
@@ -47,4 +42,9 @@ def get_dataloaders(adata : ad.AnnData, label_col='cell_type', batch_size=64, te
 
     return train_loader, test_loader
 
-read_adata([0])
+
+## TESTING
+train_adata, test_adata, acollection = read_adata([0])
+X_train, y_train, X_test, y_test = train_test_adatasplit(train_adata, test_adata)
+train_loader, test_loader = get_dataloaders()
+#print(X_train)
