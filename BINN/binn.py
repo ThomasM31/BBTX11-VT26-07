@@ -34,11 +34,10 @@ class BINN(nn.Module):
         # Create the linear layers dynamically
         self.model_layers = nn.ModuleList()
         current_in_features = in_features
-        for i, layer_size in enumerate(layers_list):
+        for layer_size in layers_list:
             self.model_layers.append(nn.Linear(current_in_features, layer_size))
             current_in_features = layer_size
         
-
     def forward(self, x):
         for i, layer in enumerate(self.model_layers):
             # retrieve the correct mask from buffers

@@ -4,6 +4,7 @@ import anndata as ad
 from anndata.experimental import AnnCollection
 from anndata.experimental.pytorch import AnnLoader
 import SingleCellDataset
+import binn
 
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 

@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model import BINN
+from BINN.binn import BINN
 import custom_train_test_split
 import anndata
 

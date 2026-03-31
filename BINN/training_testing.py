@@ -4,7 +4,7 @@ from torch import optim
 import torch.nn as nn
 import torch.nn.functional as F
 
-from model import BINN
+from BINN.binn import BINN
 
 def train_binn(model, train_loader, epochs = 10, lr = 0.001):
     criterion = nn.BCEWithLogitsLoss()

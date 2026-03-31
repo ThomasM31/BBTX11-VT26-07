@@ -1,14 +1,17 @@
-# Load data
-# Create loaders
-# Init BINN
-# Feed data:
+"""
+- Load data
+- Create loaders
+- Init BINN
+- Feed data:
     # Train BINN
     # Test BINN
-# Evaluate + Interpret BINN
-# Compare to SVM
+- Evaluate + Interpret BINN
+- Compare to SVM
+"""
 
 import argparse
 import os
+import binn
 
 def pipeline(
         to_include: list, 
