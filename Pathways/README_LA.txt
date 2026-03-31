@@ -2,7 +2,7 @@
 Lucas ReadMe, uppdaterad söndag 8/3 19:00
 -----------------------------------------
 
-Detta är det jag pillat med hittills och nu leker jag allaballan och gör min egen readme lol.
+Detta är det jag pillat med hittills:
 
 * "ReactomePathways.gmt", "ReactomePathways.txt" och "ReactomePathwaysRelationship.txt" är datan jag laddat ned,
     från https://reactome.org/download-data.
@@ -20,6 +20,5 @@ Resultatet sparas i mappen "MaskMatrixLayers". Varje celltyp har 4 lager av mask
 * Lager 0: Kopplar våra 33k+ gener till de minsta pathwaysen.
 * Lager 1-3: Kopplar ihop pathways till större och större biologiska processer.
  
-Nollor i matrisen betyder "ingen biologisk koppling", ettor betyder att en koppling finns. Implementera dessa mha pytorch nu?
-Kommer såklart byta namn på mappen/filerna sen, döpte bara t PathwaysLA just nu för att förtydliga att detta inte är komplett.
+Nollor i matrisen betyder "ingen biologisk koppling", ettor betyder att en koppling finns.
 Simons grejer ligger i simon_test.
