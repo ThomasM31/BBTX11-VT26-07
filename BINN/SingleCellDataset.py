@@ -3,7 +3,7 @@ import torch
 
 class SingleCellDataset(ad.AnnData):
     """
-    Custom Pytorch dataset for our anndata objects, for feeding into loaders
+    Custom Pytorch dataset for anndata objects, converts to Pytorch format
     """
     def __init__(self, X, y):
         self.X = X
