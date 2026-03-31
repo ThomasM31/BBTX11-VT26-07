@@ -1,6 +1,8 @@
 # Load data
 # Create loaders
 # Init BINN
-# Train BINN
-# Test BINN
+# Feed data:
+    # Train BINN
+    # Test BINN
 # Evaluate + Interpret BINN
+# Compare to SVM
