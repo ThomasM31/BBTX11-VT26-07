@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from torch import optim
 import torch.nn as nn
 import torch.nn.functional as F
 

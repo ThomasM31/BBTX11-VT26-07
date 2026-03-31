@@ -5,7 +5,7 @@ def read_adata(indices: list, train_size=0.8):
     train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, train_size)
     return train_adata, test_adata, acollection
     
-def xy_datasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
+def train_test_adatasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
     X_train = train_adata.X
     y_train = train_adata.obs["AD_status"]
     X_test = test_adata.X
