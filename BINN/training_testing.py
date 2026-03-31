@@ -46,7 +46,7 @@ def train_binn(model, train_loader, epochs = 10, lr = 0.001):
     print("finished training")
 
 
-def test_binn(model, test_loader):
+def test_binn(model, test_loader, criterion):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     model.eval()
@@ -60,9 +60,14 @@ def test_binn(model, test_loader):
             labels = labels.to(device).float().view(-1, 1)
             
             outputs = model(inputs)
+            loss = criterion(outputs, labels)
             
-            predicted = (outputs > 0.0).float()
+            running_loss += loss.item() * inputs.size(0)
+            _, predicted = torch.max(outputs, 1)
             correct += (predicted == labels).sum().item()
-            total += inputs.size(0)
+            total += labels.size(0)
     
+    epoch_loss = running_loss / total
+    epoch_acc = correct / total
+
     print(f"Test Acc: {100*correct / total:.2f} % ")
