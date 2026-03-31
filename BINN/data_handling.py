@@ -1,11 +1,13 @@
 from torch.utils.data import DataLoader
 import custom_train_test_split
 import torch
+import torch.nn as nn
 import anndata as ad
 from anndata.experimental import AnnCollection
 from anndata.experimental.pytorch import AnnLoader
 import SingleCellDataset
 import Binn
+from training_testing import *
 
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 
@@ -73,4 +75,17 @@ model = Binn.BINN(in_features=in_features,
                   layers_list=layers_list,
                   mask_list=mask_list).to(device)
 
-# __init__(self, in_features, layers_list, mask_list, activation_fn = F.relu):
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+EPOCHS = 20
+
+for epoch in range(EPOCHS):
+    train_loss, train_acc = train_binn(model, train_loader, criterion, optimizer, device)
+    test_loss, test_acc = test_binn(model, test_loader, criterion, device)
+    
+    print(f"Epoch {epoch+1} / {EPOCHS}")
+    print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
+    print(f"Test Loss:  {test_loss:.4f} | Test Acc:  {test_acc:.4f}")
+    print("-" * 30)
+
