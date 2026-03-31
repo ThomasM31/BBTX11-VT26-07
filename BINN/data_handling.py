@@ -9,7 +9,8 @@ ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
     
 def read_adata(indices: list, train_size=0.8):
     """
-
+    Reads the training anndata, testing anndata and the collection they come from.
+    Indicies indicate celltype. 
     """
     train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, train_size)
     return train_adata, test_adata, acollection
