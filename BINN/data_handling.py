@@ -1,10 +1,11 @@
 from torch.utils.data import DataLoader
 import custom_train_test_split
+import torch
 import anndata as ad
 from anndata.experimental import AnnCollection
 from anndata.experimental.pytorch import AnnLoader
 import SingleCellDataset
-import binn
+import Binn
 
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 
@@ -51,9 +52,25 @@ def get_dataloaders(train_adata : ad.AnnData, test_adata : ad.AnnData, batch_siz
 
 ## TESTING
 print("Reading adata...")
-train_adata, test_adata, acollection = read_adata(ALL_CELLTYPES)
+train_adata, test_adata, acollection = read_adata(ALL_CELLTYPES, train_size=0.8)
 print("Getting dataloaders...")
 train_loader, test_loader = get_dataloaders(train_adata, test_adata)
 print("Concatenating data...")
 adata_conc = data_concatenate(acollection)
 
+# ?????????
+in_features = 2000
+
+# In this example: 500 pathways, 50 processes, classify AD
+layers_list = [500, 50, 2]
+
+# What here??????
+mask_list = []
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+model = Binn.BINN(in_features=in_features,
+                  layers_list=layers_list,
+                  mask_list=mask_list).to(device)
+
+# __init__(self, in_features, layers_list, mask_list, activation_fn = F.relu):
