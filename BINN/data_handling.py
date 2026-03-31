@@ -9,13 +9,15 @@ ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
     
 def read_adata(indices: list, train_size=0.8):
     """
-
+    Reads the training anndata, testing anndata and the collection they come from.
+    Indicies indicate celltype. 
     """
     train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, train_size)
     return train_adata, test_adata, acollection
 
 def data_concatenate(acollection : AnnCollection):
-    pass
+    adata_conc = 2
+    return adata_conc
     
 def train_test_adatasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
     """
@@ -28,16 +30,11 @@ def train_test_adatasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
 
     return X_train, y_train, X_test, y_test
 
-def get_dataloaders(adata : ad.AnnData, label_col='cell_type', batch_size=64, test_size=0.2):
+def get_dataloaders(train_adata : ad.AnnData, test_adata : ad.AnnData, batch_size=64):
     """
     Extracts data from AnnData and returns train and test DataLoaders.
     """
-    X = adata.X
-    y = adata.obs[label_col].values
-
-    X_train, X_test, y_train, y_test = train_test_adatasplit(
-        X, y, test_size=test_size, stratify=y, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_adatasplit(train_adata, test_adata)
 
     train_dataset = SingleCellDataset(X_train, y_train)
     test_dataset = SingleCellDataset(X_test, y_test)
@@ -49,7 +46,7 @@ def get_dataloaders(adata : ad.AnnData, label_col='cell_type', batch_size=64, te
 
 
 ## TESTING
-train_adata, test_adata, acollection = read_adata([0])
-X_train, y_train, X_test, y_test = train_test_adatasplit(train_adata, test_adata)
-train_loader, test_loader = get_dataloaders()
+train_adata, test_adata, acollection = read_adata(ALL_CELLTYPES)
+#adata_conc = data_concatenate(acollection)
+train_loader, test_loader = get_dataloaders(train_adata, test_adata)
 #print(X_train)
