@@ -9,5 +9,5 @@ torchmetrics
 scikit-learn
 scipy
 shap
-os
 warnings
+numpy
