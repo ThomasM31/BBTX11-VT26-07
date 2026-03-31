@@ -1,12 +1,12 @@
 from torch.utils.data import Dataset, DataLoader
-from preprocessing import custom_train_test_split
+import custom_train_test_split
 import anndata as ad
 from anndata.experimental import AnnCollection
 from anndata.experimental.pytorch import AnnLoader
 import SingleCellDataset
 
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-    
+
 def read_adata(indices: list, train_size=0.8):
     """
     Reads the training anndata, testing anndata and the collection they come from.
@@ -16,7 +16,7 @@ def read_adata(indices: list, train_size=0.8):
     return train_adata, test_adata, acollection
 
 def data_concatenate(acollection : AnnCollection):
-    adata_conc = 2
+    adata_conc = ad.concat(acollection, label="cell_type_low_res")
     return adata_conc
     
 def train_test_adatasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
@@ -45,8 +45,11 @@ def get_dataloaders(train_adata : ad.AnnData, test_adata : ad.AnnData, batch_siz
     return train_loader, test_loader
 
 
+
 ## TESTING
+print("Reading adata...")
 train_adata, test_adata, acollection = read_adata(ALL_CELLTYPES)
-#adata_conc = data_concatenate(acollection)
+print("Getting dataloaders...")
 train_loader, test_loader = get_dataloaders(train_adata, test_adata)
-#print(X_train)
+print("Concatenating data...")
+adata_conc = data_concatenate(acollection)
