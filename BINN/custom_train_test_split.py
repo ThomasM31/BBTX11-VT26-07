@@ -161,5 +161,5 @@ if __name__ == "__main__":
 
     to_include = [int(arg) for arg in args.to_include]
     filepath = args.filepath
-    train_adata, test_adata = pipeline(to_include, args.train_size, filepath)
+    train_adata, test_adata = pipeline(to_include, filepath, args.train_size)
     
