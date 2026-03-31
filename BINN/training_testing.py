@@ -70,4 +70,5 @@ def test_binn(model, test_loader, criterion):
     epoch_loss = running_loss / total
     epoch_acc = correct / total
 
-    print(f"Test Acc: {100*correct / total:.2f} % ")
+    print(f"Test Acc: {100*epoch_acc:.2f} % ")
+    return epoch_loss, epoch_acc
