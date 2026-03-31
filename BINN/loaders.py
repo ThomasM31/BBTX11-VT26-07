@@ -7,44 +7,21 @@ import torch.nn.functional as F
 from BINN.model import BINN
 from BINN.trainer import train_binn, test_binn
 
-from preprocessing import custom_train_test_split_modified
 import anndata as ad
 
-############################################################
+# Internal
+import BINN.reading_data as reading_data
 
-# Copied from Thomas baselinemodel.py  
+ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 
-def read_adata(indices: list, train_size=0.8):
-    train_adata, test_adata, collection = custom_train_test_split_modified.pipeline(indices, train_size)
-    return train_adata, test_adata, collection
-    
-def xy_datasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
-    X_train = train_adata.X
-    y_train = train_adata.obs["AD_status"]
-    X_test = test_adata.X
-    y_test = test_adata.obs["AD_status"]
-
-    return X_train, y_train, X_test, y_test
-
-#############################################################
-
-
-
-def train_loader(train_adata,test_adata,    in_features,layer_list,mask_list,training_epochs):
+def train_loader(train_adata,test_adata, in_features,layer_list, mask_list, training_epochs):
 
     binn=BINN(in_features,layer_list,mask_list)
 
-    train_adata, test_adata, acollection = read_adata([0,1,2,3,4,5,6,7,8], train_size=0.8)
+    train_adata, test_adata, acollection = reading_data.read_adata(ALL_CELLTYPES, train_size=0.8)
 
-    X_train, y_train, X_test, y_test = xy_datasplit(train_adata,test_adata)
-    # We can  use same train test split as Thomas to get X and y training and test data
-    # X will be the gene expression data
-    # y will be the AD status data
-
-
+    X_train, y_train, X_test, y_test = reading_data.xy_datasplit(train_adata,test_adata)
     
-    # Using the data to train
-
     # Make into FloatTensors 
     X_train = torch.FloatTensor(X_train)
     X_test = torch.FloatTensor(X_test)
@@ -57,14 +34,10 @@ def train_loader(train_adata,test_adata,    in_features,layer_list,mask_list,tra
     optimizer=torch.optim.Adam(binn.parameters(),lr=0.01) # Adam optimizer is a type of optimization algorithm
     # Used to minimize loss
 
-    #optimizer=torch.optim.SGD(binn.parameters(),lr=0.01)
-    # Another common optimizer we can try
-
     criterion=nn.BCEWithLogitsLoss() # Binary cross entropy loss function
 
     epochs=training_epochs
     losses=[]
-
 
     # Losses
     for i in range(epochs):
@@ -80,10 +53,10 @@ def train_loader(train_adata,test_adata,    in_features,layer_list,mask_list,tra
         loss.backward() # backward is a method from torch that computes the gradients for tensors 
         optimizer.step() # Uses the gradients from backward and updates weights. This is were binn is learning
     
-
     with torch.no_grad(): # Do not need to store gradients anymore
         logits = binn.forward(X_test) # Go through the neural network with the updated trained weights 
         probs = torch.sigmoid(logits) # Turn logits intp probabilities
 
         for i, p in enumerate(probs):
             print(f"{i+1}.) Probability: {p.item():.4f}") # Print the probabilities
+            
