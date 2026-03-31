@@ -108,7 +108,7 @@ def custom_train_test_split(collection: AnnCollection, train_size: float):
     return train_adata, test_adata
 
 
-def pipeline(to_include: list[int], train_size: float, filepath: str):
+def pipeline(to_include: list[int], filepath: str, train_size: float):
     '''Prepare train-test split from preprocessed .h5ad files'''
     datasets = read_files(to_include, filepath)
     
