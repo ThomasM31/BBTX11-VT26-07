@@ -2,8 +2,8 @@ from preprocessing import custom_train_test_split
 import anndata as ad
 
 def read_adata(indices: list, train_size=0.8):
-    train_adata, test_adata, collection = custom_train_test_split.pipeline(indices, train_size)
-    return train_adata, test_adata, collection
+    train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, train_size)
+    return train_adata, test_adata, acollection
     
 def xy_datasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
     X_train = train_adata.X
