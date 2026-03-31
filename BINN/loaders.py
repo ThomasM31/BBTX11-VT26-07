@@ -10,17 +10,17 @@ from BINN.trainer import train_binn, test_binn
 import anndata as ad
 
 # Internal
-import BINN.reading_data as reading_data
+import BINN.data_handling as data_handling
 
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 
-def train_loader(train_adata,test_adata, in_features,layer_list, mask_list, training_epochs):
+def train_loader(train_adata, test_adata, in_features,layer_list, mask_list, training_epochs):
 
     binn=BINN(in_features,layer_list,mask_list)
 
-    train_adata, test_adata, acollection = reading_data.read_adata(ALL_CELLTYPES, train_size=0.8)
+    #train_adata, test_adata, acollection = reading_data.read_adata(ALL_CELLTYPES, train_size=0.8)
 
-    X_train, y_train, X_test, y_test = reading_data.xy_datasplit(train_adata,test_adata)
+    #X_train, y_train, X_test, y_test = reading_data.xy_datasplit(train_adata,test_adata)
     
     # Make into FloatTensors 
     X_train = torch.FloatTensor(X_train)

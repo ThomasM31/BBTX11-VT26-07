@@ -4,7 +4,6 @@ from torch import optim
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class BINN(nn.Module):
     """
     Biologically informed neural network (BINN) with binary masked weights.
