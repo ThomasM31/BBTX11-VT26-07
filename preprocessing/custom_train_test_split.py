@@ -15,11 +15,11 @@ from anndata.experimental import AnnCollection
 from anndata.experimental.pytorch import AnnLoader
 ad.settings.allow_write_nullable_strings = True
 
-def read_files(to_include: list[int]) -> dict:
+def read_files(to_include: list[int], filepath: str) -> dict:
     ### To read from current user's folders
-    user = os.environ.get('USER') or os.environ.get('USERNAME')
-    base_path = Path("/data/users") / user / "kand/data/processed_data/"
-    filepath = str(base_path)
+    #user = os.environ.get('USER') or os.environ.get('USERNAME')
+    #base_path = Path("/data/users") / user / "kand/data/processed_data/"
+    #filepath = str(base_path)
 
     labels = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
 
@@ -108,9 +108,9 @@ def custom_train_test_split(collection: AnnCollection, train_size: float):
     return train_adata, test_adata
 
 
-def pipeline(to_include: list[int], train_size: float):
+def pipeline(to_include: list[int], train_size: float, filepath: str):
     '''Prepare train-test split from preprocessed .h5ad files'''
-    datasets = read_files(to_include)
+    datasets = read_files(to_include, filepath)
     
     print('Creating encoded collection')
     collection = create_encoded_collection(datasets)
@@ -150,8 +150,16 @@ if __name__ == "__main__":
         nargs='+',
         type=int
     )
+
+    parser.add_argument(
+        "filepath",
+        help="directory where anndata files are located",
+        type=str
+    )
     
     args = parser.parse_args()
 
     to_include = [int(arg) for arg in args.to_include]
-    train_adata, test_adata = pipeline(to_include, args.train_size)
+    filepath = args.filepath
+    train_adata, test_adata = pipeline(to_include, args.train_size, filepath)
+    
