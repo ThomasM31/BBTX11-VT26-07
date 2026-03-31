@@ -30,13 +30,10 @@ def train_test_adatasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
 
     return X_train, y_train, X_test, y_test
 
-def get_dataloaders(train_adata : ad.AnnData, test_adata : ad.AnnData, label_col='cell_type', batch_size=64, test_size=0.2):
+def get_dataloaders(train_adata : ad.AnnData, test_adata : ad.AnnData, batch_size=64):
     """
     Extracts data from AnnData and returns train and test DataLoaders.
     """
-    #X = adata.X
-    #y = adata.obs[label_col].values
-
     X_train, X_test, y_train, y_test = train_test_adatasplit(train_adata, test_adata)
 
     train_dataset = SingleCellDataset(X_train, y_train)
@@ -50,7 +47,6 @@ def get_dataloaders(train_adata : ad.AnnData, test_adata : ad.AnnData, label_col
 
 ## TESTING
 train_adata, test_adata, acollection = read_adata(ALL_CELLTYPES)
-#X_train, y_train, X_test, y_test = train_test_adatasplit(train_adata, test_adata)
 #adata_conc = data_concatenate(acollection)
 train_loader, test_loader = get_dataloaders(train_adata, test_adata)
 #print(X_train)
