@@ -1,17 +1,17 @@
 # Biologically Informed Neural Network (BINN)
-## Classifying Cellular States from Gene Expression with Interpretable Machine Learning
+Classifying Cellular States from Gene Expression with Interpretable Machine Learning
 
 Nu kör vi!
 
 
 ## Cite 
-
+- Om det blir en artikel är detta bra
 
 ## Contributors
-
-Isabell Nordmark, Software Engineering, Chalmers University of Technology
-Kasper Edblad, Software Engineering, Chalmers University of Technology
-Thomas Mathiassen, Software Engineering, Chalmers University of Technology
-Lucas Antonsson, Biomedical Engineering, Chalmers University of Technology
-Simon Wåhlström, Engineering Mathematics, Chalmers University of Technology
-Valentino Tong, Engineering Mathematics, Chalmers University of Technology
+All associated with **Chalmers University of Technology**
+- Isabell Nordmark, Software Engineering
+- Kasper Edblad, Software Engineering
+- Thomas Mathiassen, Software Engineering
+- Lucas Antonsson, Biomedical Engineering
+- Simon Wåhlström, Engineering Mathematics
+- Valentino Tong, Engineering Mathematics
