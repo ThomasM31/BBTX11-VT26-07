@@ -1,6 +1,7 @@
 """
-- Load data
-- Create loaders
+- Load .h5ad data
+- Create dataloaders
+- Read pathways + create mask matrices
 - Init BINN
 - Feed data:
     # Train BINN
