@@ -12,7 +12,6 @@ from sklearn.model_selection import GroupShuffleSplit
 
 import anndata as ad
 from anndata.experimental import AnnCollection
-from anndata.experimental.pytorch import AnnLoader
 ad.settings.allow_write_nullable_strings = True
 
 def read_files(to_include: list[int], filepath: str) -> dict:
