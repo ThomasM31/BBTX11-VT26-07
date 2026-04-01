@@ -11,7 +11,7 @@
 
 import argparse
 import os
-import binn
+from Binn import BINN
 
 def pipeline(
         to_include: list, 
