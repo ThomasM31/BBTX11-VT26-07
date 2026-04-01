@@ -1,59 +1,48 @@
 import torch
-from torch import optim
-import torch.nn as nn
 
-def train_binn(model, train_loader, epochs = 10, lr = 0.001):
-    criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
+def train_binn(model, train_loader, criterion, optimizer, device):
     model.train()
+    running_loss = 0.0
+    correct = 0
+    total = 0
 
-    for epoch in range(epochs):
-        running_loss = 0.0
-        correct = 0
-        total = 0
+    for inputs, labels in train_loader:
+        inputs = inputs.to(device)
+        labels = labels.to(device)# .float().view(-1, 1) # ??????????????????????????
 
-        for inputs, labels in train_loader:
-            inputs = inputs.to(device)
-            labels = labels.to(device).float().view(-1, 1)
+        # zero parameter gradients
+        optimizer.zero_grad()
+        
+        # Forward pass
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
 
-            optimizer.zero_grad()
-            
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+        # Backward pass + optimize
+        loss.backward()
+        optimizer.step()
 
-            # vectorizde calculation from pyTorch to compare prediced with actual
-            predicted = (outputs > 0.0).float()
-            correct += (predicted == labels).sum().item()
+        # Metrics
+        _, predicted = torch.max(outputs, 1)
+        correct += (predicted == labels).sum().item()
+        # .size(0) gets the length of inputs
+        running_loss += loss.item() * inputs.size(0)
+        total += labels.size(0)
 
-            # .size(0) gets the length of inputs
-            total += inputs.size(0)
-            # add to the total loss
-            running_loss += loss.item()
+        epoch_loss = running_loss / total
+        epoch_acc = correct / total
 
-        print(f"Epoch [{epoch+1} / {epochs}] "
-              f"Train Loss: {running_loss / len(train_loader):.3f} "
-              f"Train Acc: {100*correct / total:.2f} % ")
+    return epoch_loss, epoch_acc
 
-    print("finished training")
-
-
-def test_binn(model, test_loader, criterion):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
+def test_binn(model, test_loader, criterion, device):
     model.eval()
-    
+    model.to(device)
     correct = 0
     total = 0
     
     with torch.no_grad():
         for inputs, labels in test_loader:
             inputs = inputs.to(device)
-            labels = labels.to(device).float().view(-1, 1)
+            labels = labels.to(device) #.float().view(-1, 1) # ???????????????????????????
             
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -65,6 +54,4 @@ def test_binn(model, test_loader, criterion):
     
     epoch_loss = running_loss / total
     epoch_acc = correct / total
-
-    print(f"Test Acc: {100*epoch_acc:.2f} % ")
     return epoch_loss, epoch_acc
