@@ -5,12 +5,12 @@ from anndata.experimental import AnnCollection
 import SingleCellDataset
 from BINN.binn_training import *
 
-def read_adata(indices: list, train_size=0.8):
+def read_adata(indices: list, filespath: str, train_size=0.8):
     """
     Reads the training anndata, testing anndata and the collection they come from.
     Indicies indicate celltype. 
     """
-    train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, train_size)
+    train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, filespath, train_size)
     return train_adata, test_adata, acollection
 
 def data_concatenate(acollection : AnnCollection):
