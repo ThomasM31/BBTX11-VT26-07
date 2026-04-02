@@ -1,18 +1,16 @@
-from torch.utils.data import DataLoader
 import custom_train_test_split
 import anndata as ad
-from anndata.experimental import AnnCollection
-import SingleCellDataset
+from anndata.experimental import AnnCollection, AnnLoader
 from binn_training import *
 
 def read_adata(indices: list, 
-               filespath: str, 
+               filepath: str, 
                train_size=0.8) -> tuple[ad.AnnData, ad.AnnData, AnnCollection]:
     """
     Reads the training anndata, testing anndata and the collection they come from.
     Indicies indicate celltype. 
     """
-    train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, filespath, train_size)
+    train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, filepath, train_size)
     return train_adata, test_adata, acollection
 
 def data_concatenate(acollection : AnnCollection) -> ad.AnnData:
@@ -34,18 +32,13 @@ def train_test_adatasplit(train_adata: ad.AnnData,
 
     return X_train, y_train, X_test, y_test
 
-def get_dataloaders(train_adata : ad.AnnData, 
-                    test_adata : ad.AnnData, 
-                    batch_size=64) -> tuple[DataLoader, DataLoader]:
+def create_dataloaders(train_adata: ad.AnnData,
+                       test_adata: ad.AnnData,
+                       batch_size=16) -> tuple[ad.AnnData, ad.Anndata]:
     """
-    Extracts data from AnnData and returns train and test DataLoaders.
+    Create dataloaders using AnnLoader
     """
-    X_train, X_test, y_train, y_test = train_test_adatasplit(train_adata, test_adata)
-
-    train_dataset = SingleCellDataset(X_train, y_train)
-    test_dataset = SingleCellDataset(X_test, y_test)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
+    
+    train_loader = AnnLoader(train_adata, batch_size, shuffle=True)
+    test_loader = AnnLoader(test_adata, batch_size, shuffle=False)
     return train_loader, test_loader
