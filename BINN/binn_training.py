@@ -1,6 +1,14 @@
 import torch
+from Binn import BINN
+from torch.utils.data import DataLoader
+import torch.nn as nn
+import torch.optim 
 
-def train_binn(model, train_loader, criterion, optimizer, device):
+def train_one_epoch(model: BINN, 
+                    train_loader : DataLoader, 
+                    criterion: nn.Module, 
+                    optimizer: torch.optim.Optimizer, 
+                    device) -> tuple[int, int]:
     model.train()
     running_loss = 0.0
     correct = 0
@@ -33,7 +41,10 @@ def train_binn(model, train_loader, criterion, optimizer, device):
 
     return epoch_loss, epoch_acc
 
-def test_binn(model, test_loader, criterion, device):
+def test_one_epoch(model: BINN, 
+                   test_loader: DataLoader, 
+                   criterion: nn.Module, 
+                   device) -> tuple[int, int]:
     model.eval()
     model.to(device)
     correct = 0

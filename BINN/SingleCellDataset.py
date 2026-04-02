@@ -19,3 +19,4 @@ class SingleCellDataset(ad.AnnData):
             row = row.toarray().squeeze()
         return torch.FloatTensor(row), self.y[idx]
     
+## Must X also be tensors??????

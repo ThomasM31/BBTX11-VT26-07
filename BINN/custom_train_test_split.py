@@ -82,7 +82,8 @@ def create_encoded_collection(datasets: dict) -> AnnCollection:
 
     return collection
 
-def custom_train_test_split(collection: AnnCollection, train_size: float):
+def custom_train_test_split(collection: AnnCollection, 
+                            train_size: float) -> tuple[ad.AnnData, ad.AnnData]:
     # This ensures that all rows with the same 'subject' stay together
     # Prevents the model from learning the personal signature of the individual subjects,
     # instead of markers for disease
