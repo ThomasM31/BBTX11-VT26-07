@@ -66,6 +66,9 @@ save_path = "/data/users/thomath/kand/data/processed_data/extracted_from_complet
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 
 def pipeline() -> None:
+    """
+    Run steps to load large datafiles and fetch important information for training/testing
+    """
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
 
