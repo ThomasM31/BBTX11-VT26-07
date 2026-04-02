@@ -34,6 +34,9 @@ def train_test_adatasplit(train_adata: ad.AnnData,
     return X_train, y_train, X_test, y_test
 
 def process_completed_data(datasets: dict) -> dict:
+    """
+    Fetch large preprocessed datafiles and extract preprocessed layer
+    """
     datasets_proc = {}
     for label, dataset in datasets.items():
         print(f"fetching pseudo from {label}")
@@ -53,6 +56,9 @@ def create_dataloaders(train_adata: ad.AnnData,
     return train_loader, test_loader
 
 def save_data(datasets: dict, filepath: str) -> None:
+    """
+    Save data to expressed path
+    """
     for label in list(datasets.keys()):
         print(f'Writing "{label}" to file.')
         to = os.path.join(filepath, f'{label}.h5ad')
