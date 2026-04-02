@@ -5,11 +5,15 @@ from Binn import BINN
 def pipeline(
         to_include: list, 
         train_size: int,
-
+        in_features: int,
+        layers_list: list,
+        mask_list: list,
+        activation_fn, # type ???
+        epochs: int,
     ) -> None:
         
         """
-        - Load .h5ad data
+        - Load completed+preprocessed .h5ad data
         - Create dataloaders
         - Read pathways + create mask matrices
         - Init BINN
