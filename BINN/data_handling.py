@@ -3,7 +3,7 @@ import custom_train_test_split
 import anndata as ad
 from anndata.experimental import AnnCollection
 import SingleCellDataset
-from BINN.binn_training import *
+from binn_training import *
 
 def read_adata(indices: list, filespath: str, train_size=0.8):
     """

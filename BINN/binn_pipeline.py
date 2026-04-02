@@ -1,15 +1,3 @@
-"""
-- Load .h5ad data
-- Create dataloaders
-- Read pathways + create mask matrices
-- Init BINN
-- Feed data:
-    # Train BINN
-    # Test BINN
-- Evaluate + Interpret BINN
-- Compare to SVM
-"""
-
 import argparse
 import os
 from Binn import BINN
@@ -20,9 +8,22 @@ def pipeline(
 
     ) -> None:
         
-        
+        """
+        - Load .h5ad data
+        - Create dataloaders
+        - Read pathways + create mask matrices
+        - Init BINN
+        - Feed data:
+            # Train BINN
+            # Test BINN
+        - Evaluate + Interpret BINN
+        - Compare to SVM
+        """
 
         print('Pipeline completed')
+
+
+
 
 
 
