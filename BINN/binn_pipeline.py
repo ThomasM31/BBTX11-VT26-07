@@ -26,7 +26,6 @@ def pipeline(
 
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description = "Run annData objects through BINN pipeline"
