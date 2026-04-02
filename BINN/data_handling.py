@@ -38,24 +38,8 @@ def process_completed_data(datasets: dict) -> dict:
     for label, dataset in datasets.items():
         print(f"fetching pseudo from {label}")
         # fetch pseudo-batched & preprocessed data
-        datasets_proc[label] = dataset[label].uns['pseudo'].copy()
+        datasets_proc[label] = dataset.uns['pseudo'].copy()
     return datasets_proc
-
-# From test run
-""" datasets:
-{'astro': AnnData object with n_obs × n_vars = 146638 × 18071
-    obs: 'cell_type_high_resolution', 'subject', 'ident', 'n_genes', 'n_genes_by_counts', 'total_counts', 'total_counts_mt', 'pct_counts_mt'
-    var: 'mt', 'n_cells_by_counts', 'mean_counts', 'pct_dropout_by_counts', 'total_counts'
-    uns: 'common_hvgs', 'pseudo'
-    obsm: 'X_umap'
-    layers: 'logcounts'}
-
-    pseudo uns for astro: AnnData object with n_obs × n_vars = 1234 × 1000
-    obs: 'subject', 'cell_type_high_resolution', 'n_obs_aggregated', 'AD_status'
-    var: 'mt', 'n_cells_by_counts', 'mean_counts', 'pct_dropout_by_counts', 'total_counts', 'mean', 'std'
-    uns: 'log1p'
-    layers: 'sum'
-    """
 
 def create_dataloaders(train_adata: ad.AnnData,
                        test_adata: ad.AnnData,
@@ -90,9 +74,8 @@ def pipeline() -> None:
 
     print("Saving data...")
     save_data(datasets_proc, save_path)
-    
-    # test
-    print(datasets_proc)
+
+    print("Pipeline completed!")
 
 
 if __name__ == "__main__":
