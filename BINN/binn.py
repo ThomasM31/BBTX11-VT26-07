@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 
 class BINN(nn.Module):
     """
@@ -16,7 +17,11 @@ class BINN(nn.Module):
             Mask 0 shape: (layer_list)
     """
 
-    def __init__(self, in_features, layers_list, mask_list, activation_fn = F.relu):
+    def __init__(self, 
+                 in_features: int, 
+                 layers_list: list, 
+                 mask_list: list[torch.Tensor],
+                 activation_fn = F.relu):
         super(BINN, self).__init__()
 
         self.in_features = in_features
