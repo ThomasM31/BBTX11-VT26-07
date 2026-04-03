@@ -1,22 +1,28 @@
 import torch
+from anndata.experimental import AnnLoader
 from Binn import BINN
-from torch.utils.data import DataLoader
 import torch.nn as nn
-import torch.optim 
+import torch.optim
 
 def train_one_epoch(model: BINN, 
-                    train_loader : DataLoader, 
+                    train_loader: AnnLoader, 
                     criterion: nn.Module, 
                     optimizer: torch.optim.Optimizer, 
-                    device) -> tuple[int, int]:
+                    device):
+    """
+    Trains the BINN one epoch
+    """
     model.train()
     running_loss = 0.0
     correct = 0
     total = 0
 
-    for inputs, labels in train_loader:
-        inputs = inputs.to(device)
-        labels = labels.to(device)# .float().view(-1, 1) # ??????????????????????????
+    for batch in train_loader:
+        # fetch inputs and convert to tensor
+        inputs = batch.X
+        inputs = torch.tensor(inputs).float().to(device)
+        # fetch labels and convert to tensor
+        labels = torch.tensor(batch.obs['AD_status'].values).float().reshape(-1, 1).to(device)
 
         # zero parameter gradients
         optimizer.zero_grad()
@@ -42,18 +48,24 @@ def train_one_epoch(model: BINN,
     return epoch_loss, epoch_acc
 
 def test_one_epoch(model: BINN, 
-                   test_loader: DataLoader, 
-                   criterion: nn.Module, 
-                   device) -> tuple[int, int]:
+                    test_loader: AnnLoader, 
+                    criterion: nn.Module, 
+                    device):
+    """
+    Tests the BINN one epoch
+    """
     model.eval()
     model.to(device)
     correct = 0
     total = 0
     
     with torch.no_grad():
-        for inputs, labels in test_loader:
-            inputs = inputs.to(device)
-            labels = labels.to(device) #.float().view(-1, 1) # ???????????????????????????
+        for batch in test_loader:
+            # fetch inputs and convert to tensor
+            inputs = batch.X
+            inputs = torch.tensor(inputs).float().to(device)
+            # fetch labels and convert to tensor
+            labels = torch.tensor(batch.obs['AD_status'].values).float().reshape(-1, 1).to(device)
             
             outputs = model(inputs)
             loss = criterion(outputs, labels)

@@ -46,13 +46,12 @@ def process_completed_data(datasets: dict) -> dict:
 
 def create_dataloaders(train_adata: ad.AnnData,
                        test_adata: ad.AnnData,
-                       batch_size=16) -> tuple[ad.AnnData, ad.AnnData]:
+                       batch_size=16) -> tuple[AnnLoader, AnnLoader]:
     """
-    Create dataloaders using AnnLoader
+    Create dataloaders using built in AnnLoader type
     """
-    
-    train_loader = AnnLoader(train_adata, batch_size)
-    test_loader = AnnLoader(test_adata, batch_size)
+    train_loader = AnnLoader(train_adata, batch_size=batch_size)
+    test_loader = AnnLoader(test_adata, batch_size=batch_size)
     return train_loader, test_loader
 
 def save_data(datasets: dict, filepath: str) -> None:
