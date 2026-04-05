@@ -21,6 +21,18 @@ def data_concatenate(acollection : AnnCollection) -> ad.AnnData:
     adata_conc = ad.concat(acollection, label="cell_type_low_res")
     return adata_conc
     
+    
+def transpose_datasets(datasets:dict) -> dict:
+    """
+    Transposition necessary for feeding into network
+    """
+    datasets_t = {}
+    for celltype in datasets.keys():
+        adata_t = datasets[celltype].T
+        datasets_t[celltype] = adata_t
+        
+    return datasets_t
+
 def train_test_adatasplit(train_adata: ad.AnnData, 
                           test_adata: ad.AnnData):
     """
