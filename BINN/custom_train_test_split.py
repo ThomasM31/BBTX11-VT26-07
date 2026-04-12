@@ -12,7 +12,6 @@ from sklearn.model_selection import GroupShuffleSplit
 
 import anndata as ad
 from anndata.experimental import AnnCollection
-from anndata.experimental.pytorch import AnnLoader
 ad.settings.allow_write_nullable_strings = True
 
 def read_files(to_include: list[int], filepath: str) -> dict:
@@ -83,7 +82,8 @@ def create_encoded_collection(datasets: dict) -> AnnCollection:
 
     return collection
 
-def custom_train_test_split(collection: AnnCollection, train_size: float):
+def custom_train_test_split(collection: AnnCollection, 
+                            train_size: float) -> tuple[ad.AnnData, ad.AnnData]:
     # This ensures that all rows with the same 'subject' stay together
     # Prevents the model from learning the personal signature of the individual subjects,
     # instead of markers for disease

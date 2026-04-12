@@ -1,25 +1,40 @@
-from torch.utils.data import Dataset, DataLoader
-from preprocessing import custom_train_test_split
+import custom_train_test_split as ctts
 import anndata as ad
-from anndata.experimental import AnnCollection
-from anndata.experimental.pytorch import AnnLoader
-import SingleCellDataset
+from anndata.experimental import AnnCollection, AnnLoader
+from binn_training import *
+import os
 
-ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-    
-def read_adata(indices: list, train_size=0.8):
+def read_adata(indices: list, 
+               filepath: str, 
+               train_size=0.8) -> tuple[ad.AnnData, ad.AnnData, AnnCollection]:
     """
     Reads the training anndata, testing anndata and the collection they come from.
     Indicies indicate celltype. 
     """
-    train_adata, test_adata, acollection = custom_train_test_split.pipeline(indices, train_size)
+    train_adata, test_adata, acollection = ctts.pipeline(indices, filepath, train_size)
     return train_adata, test_adata, acollection
 
-def data_concatenate(acollection : AnnCollection):
-    adata_conc = 2
+def data_concatenate(acollection : AnnCollection) -> ad.AnnData:
+    """
+    Concatenate the AnnCollection to a single AnnData object
+    """
+    adata_conc = ad.concat(acollection, label="cell_type_low_res")
     return adata_conc
     
-def train_test_adatasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
+    
+def transpose_datasets(datasets:dict) -> dict:
+    """
+    Transposition necessary for feeding into network
+    """
+    datasets_t = {}
+    for celltype in datasets.keys():
+        adata_t = datasets[celltype].T
+        datasets_t[celltype] = adata_t
+        
+    return datasets_t
+
+def train_test_adatasplit(train_adata: ad.AnnData, 
+                          test_adata: ad.AnnData):
     """
     Creates the train/test split for the input anndata
     """
@@ -30,23 +45,58 @@ def train_test_adatasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
 
     return X_train, y_train, X_test, y_test
 
-def get_dataloaders(train_adata : ad.AnnData, test_adata : ad.AnnData, batch_size=64):
+def process_completed_data(datasets: dict) -> dict:
     """
-    Extracts data from AnnData and returns train and test DataLoaders.
+    Fetch large preprocessed datafiles and extract preprocessed layer
     """
-    X_train, X_test, y_train, y_test = train_test_adatasplit(train_adata, test_adata)
+    datasets_proc = {}
+    for label, dataset in datasets.items():
+        print(f"fetching pseudo from {label}")
+        # fetch pseudo-batched & preprocessed data
+        datasets_proc[label] = dataset.uns['pseudo'].copy()
+    return datasets_proc
 
-    train_dataset = SingleCellDataset(X_train, y_train)
-    test_dataset = SingleCellDataset(X_test, y_test)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
+def create_dataloaders(train_adata: ad.AnnData,
+                       test_adata: ad.AnnData,
+                       batch_size=16) -> tuple[AnnLoader, AnnLoader]:
+    """
+    Create dataloaders using built in AnnLoader type
+    """
+    train_loader = AnnLoader(train_adata, batch_size=batch_size)
+    test_loader = AnnLoader(test_adata, batch_size=batch_size)
     return train_loader, test_loader
 
+def save_data(datasets: dict, filepath: str) -> None:
+    """
+    Save data to expressed path
+    """
+    for label in list(datasets.keys()):
+        print(f'Writing "{label}" to file.')
+        to = os.path.join(filepath, f'{label}.h5ad')
 
-## TESTING
-train_adata, test_adata, acollection = read_adata(ALL_CELLTYPES)
-#adata_conc = data_concatenate(acollection)
-train_loader, test_loader = get_dataloaders(train_adata, test_adata)
-#print(X_train)
+        datasets[label].write_h5ad(to)
+
+# TESTING
+base_path = "/data/shared/alzgene26/data"
+data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
+save_path = "/data/users/thomath/kand/data/processed_data/extracted_from_completed/"
+ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
+
+def pipeline() -> None:
+    """
+    Run steps to load large datafiles and fetch important information for training/testing
+    """
+    print("Reading data into datasets...")
+    datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
+
+    print("Processing datasets...")
+    datasets_proc = process_completed_data(datasets)
+
+    print("Saving data...")
+    save_data(datasets_proc, save_path)
+
+    print("Pipeline completed!")
+
+
+if __name__ == "__main__":
+    pipeline()
