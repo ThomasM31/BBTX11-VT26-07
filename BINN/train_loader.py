@@ -11,16 +11,16 @@ import anndata
 
 # Copied from Thomas baselinemodel.py  
 
-def read_adata(indices: list, train_size=0.8):
+def read_adata(indices: list, filepath: str, train_size=0.8):
     #train_adata, test_adata, collection = custom_train_test_split_modified.pipeline(indices, train_size)
-    train_adata, test_adata, collection = custom_train_test_split.pipeline(indices, train_size)
+    train_adata, test_adata, collection = custom_train_test_split.pipeline(indices, filepath, train_size)
     return train_adata, test_adata, collection
     
 def xy_datasplit(train_adata: anndata.AnnData, test_adata: anndata.AnnData):
     X_train = train_adata.X
-    y_train = train_adata.obs["AD_status"]
+    y_train = train_adata.uns['pseudo'].obs["AD_status"]
     X_test = test_adata.X
-    y_test = test_adata.obs["AD_status"]
+    y_test = test_adata.uns['pseudo'].obs["AD_status"]
 
     return X_train, y_train, X_test, y_test
 
@@ -28,7 +28,7 @@ def xy_datasplit(train_adata: anndata.AnnData, test_adata: anndata.AnnData):
 
 
 
-def train_loader(X_train,X_test,y_train,y_test,in_features,layer_list,mask_list,training_epochs):
+def train_loader(X_train,y_train,X_test,y_test,in_features,layer_list,mask_list,training_epochs):
 
     binn=BINN(in_features,layer_list,mask_list)
 
