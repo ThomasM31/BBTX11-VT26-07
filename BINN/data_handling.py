@@ -3,6 +3,12 @@ import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
 from binn_training import *
 import os
+import pandas as pd
+
+# GLOBALS
+ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
+MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+              for i in range(5)]
 
 def read_adata(indices: list, 
                filepath: str, 
@@ -76,11 +82,22 @@ def save_data(datasets: dict, filepath: str) -> None:
 
         datasets[label].write_h5ad(to)
 
+def read_masks(mask_paths, print_shapes=False) -> dict:
+    """
+    Reads all available masks into dict
+    """
+    mask_dict = {}
+    for i, mask_path in enumerate(mask_paths):
+        df = pd.read_csv(mask_path, index_col=0)
+        mask_dict.update({f"df{i}": df})
+        if print_shapes:
+            print(f"Matrix {i} shape: {df.shape}")
+    return mask_dict
+
 # TESTING
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
 save_path = "/data/users/thomath/kand/data/processed_data/extracted_from_completed/"
-ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 
 def pipeline() -> None:
     """
