@@ -11,7 +11,7 @@ from sklearn.metrics import roc_curve, auc, confusion_matrix
 
 # Configuration (global constants and paths):
 CELL_TYPES = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
-SAVE_DIR = "figures/"
+SAVE_DIR = "figures/ml_model_evaluations"
 N_BOOTSTRAP = 1000
 RANDOM_SEED = 42
 
