@@ -1,3 +1,4 @@
+# OBS - outputted/created figures are only placeholders for now. Data is currently randomized/pseudo. 
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -6,7 +7,7 @@ import matplotlib.pyplot as plt
 # Data input:
 
 # ------------------------
-# Made up / placeholder data:  (DELETE THIS ENTIRE BLOCK WHEN YOU HAVE REAL DATA)
+# Made up / placeholder data:  (DELETE THIS ENTIRE BLOCK WHEN WE HAVE REAL DATA)
 np.random.seed(42) # Keeps the random numbers the same every run
 n_patients = 100
 n_proteins = 20
@@ -27,14 +28,14 @@ severity_labels = pd.Series(['Less severe']*50 + ['More severe']*50)
 
 
 # ------------------------
-# REAL DATA BLOCK - for later:
-# Load your real SHAP data from a CSV file.
-# df_real_data = pd.read_csv("path/to/your/real_shap_data.csv")
+# REAL DATA BLOCK, for later:
+# Load our real SHAP data from a CSV file.
+# df_real_data = pd.read_csv("path/to/our/real_shap_data.csv")
 #
 # Save the severity column to 'severity_labels'
 # severity_labels = df_real_data['Patient_Status'] 
 #
-# Keep ONLY the 20 protein columns in 'df_top20'
+# Keep only the 20 protein columns in 'df_top20' ?
 # df_top20 = df_real_data.drop(columns=['Patient_Status']) 
 # END OF REAL DATA BLOCK
 # ------------------------
@@ -51,7 +52,7 @@ df_long = df_melted.melt(id_vars='Severity', var_name='Protein', value_name='Qua
 
 
 # Clustermap:
-# method='ward' and metric='euclidean' match your reference image
+# method='ward' and metric='euclidean' match our reference image
 g = sns.clustermap(
     data=df_top20,
     row_colors=severity_colors,
@@ -65,8 +66,8 @@ g = sns.clustermap(
 # Add simple labels
 g.ax_heatmap.set_ylabel("Samples (Patients)")
 g.ax_heatmap.set_xlabel("Top 20 Proteins")
-plt.savefig("figures/placeholder_clustermap.png")
-# plt.show() # Only use this if you run it locally on your laptop
+plt.savefig("figures/hierarchicalclustering/placeholder_clustermap.png")
+# plt.show() # Only use this if we run it locally on our laptops
 
 
 # =Boxplot & presence barplot:
@@ -106,4 +107,4 @@ ax_bar.legend_.remove() # Remove redundant legend
 # Rotate x-axis labels to avoid overlap
 plt.xticks(rotation=45, ha='right')
 plt.tight_layout()
-plt.savefig("figures/placeholder_boxplot.png")
+plt.savefig("figures/hierarchicalclustering/placeholder_boxplot.png")
