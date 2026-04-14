@@ -3,7 +3,8 @@ import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
 from binn_training import *
 import os
-import pandas as pd
+from scipy.sparse import csr_matrix
+import pandas as pd, numpy as np
 
 # GLOBALS
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
@@ -112,35 +113,63 @@ def align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         # Update dictionary
         datasets_aligned.update({label: adata_aligned})
 
-        print(f"Overlapping genes kept: {adata_aligned.n_vars} for {label}")
-        print(f"Genes dropped: {adata.n_vars - adata_aligned.n_vars}\n")
+        #print(f"Overlapping genes kept: {adata_aligned.n_vars} for {label}")
+        #print(f"Genes dropped: {adata.n_vars - adata_aligned.n_vars}\n")
 
     return datasets_aligned
 
-def pad_data(datasets: dict):
+def pad_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
     """
-    Pads missing genes with zeros
+    Pads the adatas with sparse zero vectors for missing target genes,
+    returns: adatas sorted in alphabetical order. 
     """
+    target_genes = list(input_masks.index)
+    sorted_target_genes = sorted(list(target_genes))
+    datasets_padded = {}
 
+    for label in list(datasets.keys()):
+        adata = datasets[label]
+        missing_genes = list(set(sorted_target_genes) - set(adata.var_names)) 
+
+        # Create the sparse zero matrix for missing genes
+        if len(missing_genes) > 0:
+            zero_data = csr_matrix((adata.n_obs, len(missing_genes)), dtype=np.float32)
+            
+            # convert back to adata
+            adata_missing = ad.AnnData(X=zero_data, obs=adata.obs)
+            adata_missing.var_names = missing_genes
+            
+            # Concatenate the existing data with the missing zero-padded data
+            adata_padded = ad.concat([adata, adata_missing], axis=1, merge='same')
+        else:
+            adata_padded = adata.copy()
+            
+        # Reorder the columns to match alphabetical target list
+        adata_ordered = adata_padded[:, sorted_target_genes].copy()
+
+        # add padded adata to datasets
+        datasets_padded.update({label: adata_padded})
+        
+        print(f"Final tensor-ready shape: {adata_ordered.shape}\n")
     return datasets_padded
 
 # TESTING
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
-save_path = "/data/users/thomath/kand/data/processed_data/extracted_from_completed/"
+comp_proc_data_path = "/data/users/thomath/kand/data/processed_data/extracted_from_completed/"
 
 def pipeline() -> None:
     """
     Run steps to load large datafiles and fetch important information for training/testing
     """
     print("Reading data into datasets...")
-    datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
+    datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=comp_proc_data_path)
 
     print("Processing datasets...")
     datasets_proc = process_completed_data(datasets)
 
-    print("Saving data...")
-    save_data(datasets_proc, save_path)
+    #print("Saving data...")
+    #save_data(datasets_proc, comp_proc_data_path)
 
     print("Pipeline completed!")
 
