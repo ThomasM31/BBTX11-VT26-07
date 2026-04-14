@@ -94,18 +94,35 @@ def read_masks(mask_paths, print_shapes=False) -> dict:
             print(f"Matrix {i} shape: {df.shape}")
     return mask_dict
 
+def align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
+    """
+    Subsets the adatas to only include genes present in BINN.
+    Drops any HVGs that are not part of the BINN's pathways.
+    """
+    target_genes = list(input_masks.index)
+    datasets_aligned = {}
+
+    for label in list(datasets.keys()):
+        adata = datasets[label]
+        # Find the intersection of genes
+        overlapping_genes = list(set(adata.var_names) & set(target_genes))
+        
+        # Subset the dataset
+        adata_aligned = adata[:, overlapping_genes].copy()
+        # Update dictionary
+        datasets_aligned.update({label: adata_aligned})
+
+        print(f"Overlapping genes kept: {adata_aligned.n_vars} for {label}")
+        print(f"Genes dropped: {adata.n_vars - adata_aligned.n_vars}\n")
+
+    return datasets_aligned
+
 def pad_data(datasets: dict):
     """
     Pads missing genes with zeros
     """
 
     return datasets_padded
-
-def align_data(datasets: dict):
-    """
-    Sort adata in datasets alphabetically for aligning with BINN
-    """
-    return datasets_aligned
 
 # TESTING
 base_path = "/data/shared/alzgene26/data"
