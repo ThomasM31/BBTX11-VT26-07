@@ -148,7 +148,7 @@ def pad_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         adata_ordered = adata_padded[:, sorted_target_genes].copy()
 
         # add padded adata to datasets
-        datasets_padded.update({label: adata_padded})
+        datasets_padded.update({label: adata_ordered})
         
         print(f"Final shape: {adata_ordered.shape}\n")
     return datasets_padded
