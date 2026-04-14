@@ -94,6 +94,19 @@ def read_masks(mask_paths, print_shapes=False) -> dict:
             print(f"Matrix {i} shape: {df.shape}")
     return mask_dict
 
+def pad_data(datasets: dict):
+    """
+    Pads missing genes with zeros
+    """
+
+    return datasets_padded
+
+def align_data(datasets: dict):
+    """
+    Sort adata in datasets alphabetically for aligning with BINN
+    """
+    return datasets_aligned
+
 # TESTING
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
