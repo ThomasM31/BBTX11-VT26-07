@@ -150,7 +150,7 @@ def pad_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         # add padded adata to datasets
         datasets_padded.update({label: adata_padded})
         
-        print(f"Final tensor-ready shape: {adata_ordered.shape}\n")
+        print(f"Final shape: {adata_ordered.shape}\n")
     return datasets_padded
 
 # TESTING
