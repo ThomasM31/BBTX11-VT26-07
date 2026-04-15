@@ -1,6 +1,5 @@
 import torch.nn as nn
 import torch.nn.functional as F
-import torch
 
 class BINN(nn.Module):
     """
@@ -16,12 +15,11 @@ class BINN(nn.Module):
             connectivity between layers.
             Mask 0 shape: (layer_list)
     """
-
     def __init__(self, 
                  in_features: int, 
                  layers_list: list, 
-                 mask_list: list[torch.Tensor],
-                 activation_fn = F.relu):
+                 mask_list: list,
+                 activation_fn = nn.LeakyReLU(0.1)):
         super(BINN, self).__init__()
 
         self.in_features = in_features
@@ -29,17 +27,27 @@ class BINN(nn.Module):
         self.mask_list = mask_list
         self.n_masks = len(mask_list)
         self.activation_fn = activation_fn
-
+        
         # Move masks to the same device as the model and store them in a list
         for i, m in enumerate(mask_list):
             self.register_buffer(f'mask_{i}', m)
 
-        # Create the linear layers dynamically
+        # Create the linear layers & batch normalizations dynamically
         self.model_layers = nn.ModuleList()
+        self.batch_norms = nn.ModuleList()
+
         current_in_features = in_features
         for layer_size in layers_list:
+            # Create Linear layer
             self.model_layers.append(nn.Linear(current_in_features, layer_size))
+
+            # Create BatchNorm, except for final layer
+            if layer_size > 1:
+                self.batch_norms.append(nn.BatchNorm1d(layer_size))
+
             current_in_features = layer_size
+
+        print(f"Created {len(self.model_layers)} layers and {len(self.batch_norms)} batch norms")
         
     def forward(self, x):
         for i, layer in enumerate(self.model_layers):
@@ -57,8 +65,10 @@ class BINN(nn.Module):
             x = F.linear(x, masked_weight, layer.bias)
 
             # Activation function (except for the last layer)
-            # TODO: Should we change which layers that use activation functions
-            if i < len(self.model_layers) - 1:
+            if i < len(self.batch_norms):
+                # Re-scale signal
+                x = self.batch_norms[i](x) 
+                # Activation function
                 x = self.activation_fn(x)
     
         return x
