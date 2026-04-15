@@ -35,7 +35,7 @@ def train_one_epoch(model: BINN,
         optimizer.step()
 
         # Metrics
-        _, predicted = torch.max(outputs, 1)
+        predicted = (outputs > 0.5).float()
         correct += (predicted == labels).sum().item()
         # .size(0) gets the length of inputs
         running_loss += loss.item() * inputs.size(0)
@@ -55,10 +55,9 @@ def test_one_epoch(model: BINN,
     """
     model.eval()
     model.to(device)
-    running_loss = 0.0
-
     correct = 0
     total = 0
+    running_loss = 0.0
     
     with torch.no_grad():
         for batch in test_loader:
@@ -71,7 +70,7 @@ def test_one_epoch(model: BINN,
             loss = criterion(outputs, labels)
             
             running_loss += loss.item() * inputs.size(0)
-            _, predicted = torch.max(outputs, 1)
+            predicted = (outputs > 0.5).float()
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
     
