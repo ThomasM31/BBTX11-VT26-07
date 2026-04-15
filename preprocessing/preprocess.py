@@ -66,28 +66,32 @@ def read_hvg_adata(datasets: dict, filepath: str) -> None:
         datasets[label] = ad.read_h5ad(f)
         print(datasets[label])
 
-def filter_cells(datasets: dict, min_genes: int=200) -> None:
+def filter_cells_by_min_genes(datasets: dict, min_genes: int=200) -> None:
     for label, adata in datasets.items():
-        print(f'Filtering cells for {label}')
+        print(f"Filtering {label} cells with <{min_genes} genes...")
         old_cells = adata.n_obs
         
-        print(f'Original nr cells {label}: {old_cells}')
-        
-        print(f"Filtering cells with <{min_genes} genes...")
         sc.pp.filter_cells(adata, min_genes=min_genes)
         
-        print(f"Filtered data, shape={adata.shape}\n")
+        print(f"Filtered data, shape={adata.shape}")
+        print(f"{label}: {old_cells} -> {adata.n_obs} cells (removed {old_cells - adata.n_obs})\n")
 
-        print("Calculating QC metrics")
+
+def filter_cells_by_mitochondrial_content(datasets: dict, mt_threshold: float=5.0) -> None:
+    for label, adata in datasets.items():
+        print(f'Filtering cells for {label} by mitochondrial content')
+        old_cells = adata.n_obs
+
         adata.var["mt"] = np.array(adata.var_names.str.startswith("MT-"), dtype=bool)
         print("MT genes detected:", adata.var["mt"].sum())
 
         sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True)
 
-        print("Dropping cells with >5% mitochondrial counts...")
-        datasets[label] = adata[adata.obs.pct_counts_mt < 5, :].copy()
+        print(f"Dropping cells with >{mt_threshold}% mitochondrial counts...")
+        datasets[label] = adata[adata.obs.pct_counts_mt < mt_threshold, :].copy()
 
         print(f"{label}: {old_cells} -> {adata.n_obs} cells (removed {old_cells - adata.n_obs})")
+
 
 def write_gene_expr_count(datasets: dict, filepath: str) -> None:
 
@@ -363,9 +367,9 @@ def filter_common_hvgs(datasets: dict, filepath: str, hvg_file:str) -> None:
     ## save common hvgs in adata object
     for label, adata in datasets.items():
         common_hvgs = [g for g in common_hvgs if g in adata.var_names]
-        adata.uns['common_hvgs'] = adata[:, common_hvgs].copy()
+        datasets[label].uns['common_hvgs'] = adata[:, common_hvgs].copy()
         print(f'Writing common hvgs to datset for {label}.')
-        print(adata.uns['common_hvgs'])
+        print(datasets[label].uns['common_hvgs'])
 
 def pseudobulk(datasets: dict) -> None:
     # Perform pseudobulk by test subject and high res celltype
@@ -457,8 +461,8 @@ def add_metadata(datasets: dict, filepath: str, is_float=True) -> None:
     # int for BCE loss
     v_yes, v_no = (1.0, 0.0) if is_float else (1, 0)
     
-    md_sel[AD_status_lbl].replace(to_replace='yes', value=v_yes, inplace=True)
-    md_sel[AD_status_lbl].replace(to_replace='no', value=v_no, inplace=True)
+    md_sel = md_sel.copy()
+    md_sel[AD_status_lbl] = md_sel[AD_status_lbl].replace({'yes': v_yes, 'no': v_no})
 
     # create map with subject as key, AD status as value
     status_map = dict(zip(md_sel['subject'], md_sel[AD_status_lbl]))
@@ -475,6 +479,9 @@ def move_pseudo_main(datasets: dict):
         pseudo = adata.uns['pseudo']
 
         datasets[label] = ad.AnnData(pseudo)
+
+        print(f'Dataset {label} after moving pseudo to main:')
+        print(datasets[label])
 
 
 def save_files(datasets: dict, filepath: str, stage:str) -> None:

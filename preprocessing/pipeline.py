@@ -90,7 +90,15 @@ def pipeline(
 
     #-------PERFORM FILTERING-------
     # filter bad cells
-    pre.filter_cells(datasets, min_genes=200)
+    
+    # The cell filtering doesn't actually remove anything from our dataset using
+    # the default values, therefore commented out
+
+    # remove cells with less than 200 expressed genes
+    #pre.filter_cells_by_min_genes(datasets, min_genes=200)
+    
+    # remove cells with mito gene expression over threshold
+    #pre.filter_cells_by_mitochondrial_content(datasets)
 
     # filter lowly expressed genes
     pre.filter_genes(datasets, genes_keep_path, min_cells)
