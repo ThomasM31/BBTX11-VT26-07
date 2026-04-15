@@ -34,6 +34,8 @@ def pipeline(
     figures_path            = base_path / "figures"
     metadata_path           = base_path / "supplementary_data"
     completed_path          = base_path / processed_data / "completed" / run_vars
+    test_data_path          = base_path / processed_data / "test_data"
+    pathway_data_path       = base_path / 'PathwayData'
 
     # create folders if they do not exist
     gene_expr_count_path.mkdir(parents=True, exist_ok=True)
@@ -42,7 +44,9 @@ def pipeline(
     hvg_common_path.mkdir(parents=True, exist_ok=True)
     figures_path.mkdir(parents=True, exist_ok=True)
     completed_path.mkdir(parents=True, exist_ok=True)
-    
+    test_data_path.mkdir(parents=True, exist_ok=True)
+    pathway_data_path.mkdir(parents=True, exist_ok=True)
+
     conv_data_path           = str(conv_data_path)
     gene_expr_count_path    = str(gene_expr_count_path)
     genes_keep_path         = str(genes_keep_path)
@@ -51,6 +55,8 @@ def pipeline(
     figures_path            = str(figures_path)
     metadata_path           = str(metadata_path)
     completed_path          = str(completed_path)
+    test_data_path          = str(test_data_path)
+    pathway_data_path          = str(pathway_data_path)
 
     filepath = str(base_path)
 
@@ -89,22 +95,31 @@ def pipeline(
     # filter lowly expressed genes
     pre.filter_genes(datasets, genes_keep_path, min_cells)
 
+    # filter genes that don't exist in Reactome
+    pre.filter_non_reactome_genes(datasets, pathway_data_path, 'ReactomePathways.gmt')
+
     #-------FIND AND FILTER HVGs-------
     
     # make one .txt file for each cell type with 
     # genes sorted from most to least variable
     # this method does not require normalized data
     for label, adata in datasets.items():
+        
         f = os.path.join(hvg_lists_path, f'{label}.txt')
         if not Path(f).exists():
             d = {label:adata}
             pre.extract_hvgs_full_list(d, hvg_lists_path)
 
-    # find common hvgs from txt files
-    included = "_".join(datasets.keys())
+    # prepare filename to save common hvgs
+    # if all cell types are included, for brevity use 'all'
+    if len(list(datasets.keys())) == 9:
+        included = 'all'
+    else:
+        included = "_".join(datasets.keys())
     hvg_file = f'{included}_common_{min_common_hvgs}.txt'
     f = os.path.join(hvg_common_path, hvg_file)
     
+    # Find n_top common hvgs from txt files
     if not Path(f).exists():
         pre.find_common_hvgs(
             datasets, 
@@ -116,9 +131,6 @@ def pipeline(
             )
 
     # filter by common hvgs
-    # requires a file with all included cell types in the file name, 
-    # and the min nr of common HVGs to include
-    # e.g. astro_immune_common_1000.txt
     pre.filter_common_hvgs(datasets, hvg_common_path, hvg_file)
 
     #-------PSEUDOBULK AND NORMALIZE-------
@@ -134,12 +146,20 @@ def pipeline(
     # add disease status
     pre.add_metadata(datasets, metadata_path)
 
-    pre.save_files(datasets, completed_path, 'completed')
+    #-------UMAPS-------
 
     # visualize how the preprocessing has improved (?) 
     # separation of cells (slow and uses a lot of memory!!)
     # for this one it is better to load each data set separately
-    if draw_umaps: pre.draw_umaps(datasets=datasets, filepath=figures_path)
+    #if draw_umaps: pre.draw_umaps(datasets=datasets, filepath=figures_path)
+
+    #-------MOVE PROCESSED DATA TO MAIN LAYER AND SAVE-------
+    
+    # move pseudobulk data to main layer, discard everything else
+    # this will make the files a lot smaller
+    pre.move_pseudo_main(datasets)
+
+    pre.save_files(datasets, completed_path, 'completed')
 
     print('Pipeline completed')
 
