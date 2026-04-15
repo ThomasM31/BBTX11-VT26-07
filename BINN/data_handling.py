@@ -152,13 +152,13 @@ def pad_align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         #print(f"Final shape: {adata_ordered.shape}\n")
     return datasets_padded
 
-def create_model(in_features:int, layers_list:list, tensor_masks:list, device):
+def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=0.01):
     model = BINN(in_features=in_features,
                   layers_list=layers_list,
                   mask_list=tensor_masks).to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate)
 
     return model, criterion, optimizer
 
@@ -167,7 +167,7 @@ def training_loop(model:BINN, train_loader, test_loader, criterion, optimizer, d
         train_loss, train_acc = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
         test_loss, test_acc = bt.test_one_epoch(model, test_loader, criterion, device)
         
-        print(f"Epoch {epoch+1} / {5}")
+        print(f"Epoch {epoch+1} / {epochs}")
         print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
         print(f"Test Loss:  {test_loss:.4f} | Test Acc:  {test_acc:.4f}")
         print("-" * 30)
@@ -179,7 +179,7 @@ comp_proc_data_path = "/data/users/thomath/kand/data/processed_data/extracted_fr
 
 def pipeline() -> None:
     # GLOBALS
-    EPOCHS = 30
+    EPOCHS = 15
     TRAIN_SIZE = 0.8
     ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
     MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
@@ -195,7 +195,7 @@ def pipeline() -> None:
     in_features, layers_list, tensor_masks = compute_features(masks, device)
 
     print("Creating BINN...")
-    model, criterion, optimizer = create_model(in_features, layers_list, tensor_masks, device)
+    model, criterion, optimizer = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.01)
 
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=comp_proc_data_path)
@@ -227,5 +227,5 @@ def pipeline() -> None:
     print("Pipeline completed!")
 
 if __name__ == "__main__":
-    #pipeline()
-    pass
+    pipeline()
+
