@@ -2,13 +2,12 @@ from torch.utils.data import DataLoader
 import custom_train_test_split as ctts
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
-from binn_training import *
 import os
 import pandas as pd, numpy as np
 from scipy.sparse import csr_matrix
 import torch.nn as nn
 import torch
-from BINN import Binn
+from Binn import BINN
 import binn_training as bt
 
 def data_concatenate(acollection : AnnCollection):
