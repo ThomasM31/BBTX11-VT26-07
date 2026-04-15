@@ -1,47 +1,29 @@
+from torch.utils.data import DataLoader
 import custom_train_test_split as ctts
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
 from binn_training import *
 import os
-from scipy.sparse import csr_matrix
 import pandas as pd, numpy as np
+from scipy.sparse import csr_matrix
+import torch.nn as nn
+import torch
+from BINN import Binn
+import binn_training as bt
 
 # GLOBALS
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
               for i in range(5)]
 
-def read_adata(indices: list, 
-               filepath: str, 
-               train_size=0.8) -> tuple[ad.AnnData, ad.AnnData, AnnCollection]:
-    """
-    Reads the training anndata, testing anndata and the collection they come from.
-    Indicies indicate celltype. 
-    """
-    train_adata, test_adata, acollection = ctts.pipeline(indices, filepath, train_size)
-    return train_adata, test_adata, acollection
-
-def data_concatenate(acollection : AnnCollection) -> ad.AnnData:
+def data_concatenate(acollection : AnnCollection):
     """
     Concatenate the AnnCollection to a single AnnData object
     """
     adata_conc = ad.concat(acollection, label="cell_type_low_res")
     return adata_conc
     
-    
-def transpose_datasets(datasets:dict) -> dict:
-    """
-    Transposition necessary for feeding into network
-    """
-    datasets_t = {}
-    for celltype in datasets.keys():
-        adata_t = datasets[celltype].T
-        datasets_t[celltype] = adata_t
-        
-    return datasets_t
-
-def train_test_adatasplit(train_adata: ad.AnnData, 
-                          test_adata: ad.AnnData):
+def train_test_adatasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
     """
     Creates the train/test split for the input anndata
     """
@@ -53,9 +35,6 @@ def train_test_adatasplit(train_adata: ad.AnnData,
     return X_train, y_train, X_test, y_test
 
 def process_completed_data(datasets: dict) -> dict:
-    """
-    Fetch large preprocessed datafiles and extract preprocessed layer
-    """
     datasets_proc = {}
     for label, dataset in datasets.items():
         print(f"fetching pseudo from {label}")
@@ -63,11 +42,22 @@ def process_completed_data(datasets: dict) -> dict:
         datasets_proc[label] = dataset.uns['pseudo'].copy()
     return datasets_proc
 
+def transpose_datasets(datasets:dict) -> dict:
+    """
+    Transposition necessary for feeding into network
+    """
+    datasets_t = {}
+    for celltype in datasets.keys():
+        adata_t = datasets[celltype].T
+        datasets_t[celltype] = adata_t
+        
+    return datasets_t
+
 def create_dataloaders(train_adata: ad.AnnData,
                        test_adata: ad.AnnData,
                        batch_size=16) -> tuple[AnnLoader, AnnLoader]:
     """
-    Create dataloaders using built in AnnLoader type
+    Create dataloaders using built in loader for AnnData
     """
     train_loader = AnnLoader(train_adata, batch_size=batch_size)
     test_loader = AnnLoader(test_adata, batch_size=batch_size)
@@ -75,12 +65,12 @@ def create_dataloaders(train_adata: ad.AnnData,
 
 def save_data(datasets: dict, filepath: str) -> None:
     """
-    Save data to expressed path
+    Saves anndata dataset to filepath
     """
     for label in list(datasets.keys()):
         print(f'Writing "{label}" to file.')
         to = os.path.join(filepath, f'{label}.h5ad')
-
+        # Save individual files
         datasets[label].write_h5ad(to)
 
 def read_masks(mask_paths, print_shapes=False) -> dict:
@@ -94,6 +84,21 @@ def read_masks(mask_paths, print_shapes=False) -> dict:
         if print_shapes:
             print(f"Matrix {i} shape: {df.shape}")
     return mask_dict
+
+def compute_features(masks:dict, device) -> tuple[list, int, list, list]:
+    #Extracting pure number representation matrices
+    mask_matrix_list = [masks[mask].to_numpy() for mask in masks]
+    # Starting amount of features
+    in_features = masks["df0"].shape[0]
+    # Extract layer dimensions
+    layers_list = [masks[mask].shape[1] for mask in masks]
+
+    # Conversion for mask matrix list, creates tensors for BINN, transposed
+    tensor_masks = [torch.tensor(mask).float().t() for mask in mask_matrix_list]
+    # Put on device
+    tensor_masks = [mask.to(device) for mask in tensor_masks]
+
+    return mask_matrix_list, in_features, layers_list, tensor_masks
 
 def subset_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
     """
@@ -150,8 +155,28 @@ def pad_align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         # add padded adata to datasets
         datasets_padded.update({label: adata_ordered})
         
-        print(f"Final shape: {adata_ordered.shape}\n")
+        #print(f"Final shape: {adata_ordered.shape}\n")
     return datasets_padded
+
+def create_model(in_features:int, layers_list:list, tensor_masks:list, device):
+    model = BINN(in_features=in_features,
+                  layers_list=layers_list,
+                  mask_list=tensor_masks).to(device)
+
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    return model, criterion, optimizer
+
+def training_loop(model:BINN, train_loader, test_loader, criterion, optimizer, device, epochs:int) -> None:
+    for epoch in range(epochs):
+        train_loss, train_acc = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
+        test_loss, test_acc = bt.test_one_epoch(model, test_loader, criterion, device)
+        
+        print(f"Epoch {epoch+1} / {5}")
+        print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
+        print(f"Test Loss:  {test_loss:.4f} | Test Acc:  {test_acc:.4f}")
+        print("-" * 30)
 
 # TESTING
 base_path = "/data/shared/alzgene26/data"
@@ -159,8 +184,14 @@ data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
 comp_proc_data_path = "/data/users/thomath/kand/data/processed_data/extracted_from_completed/"
 
 def pipeline() -> None:
+    print("Fetching device...")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     print("Reading masks...")
     masks = read_masks(MASK_PATHS)
+
+    print("Computing BINN features...")
+    mask_matrix_list, in_features, layers_list, tensor_masks = compute_features(masks, device)
 
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=comp_proc_data_path)
@@ -179,6 +210,6 @@ def pipeline() -> None:
     
     print("Pipeline completed!")
 
-
 if __name__ == "__main__":
-    pipeline()
+    #pipeline()
+    pass
