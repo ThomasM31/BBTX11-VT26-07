@@ -153,6 +153,9 @@ def pad_align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
     return datasets_padded
 
 def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=0.001):
+    """
+    Instantiate BINN and accompanying criterion, optimizer and scheduler
+    """
     model = BINN(in_features=in_features,
                   layers_list=layers_list,
                   mask_list=tensor_masks).to(device)
@@ -171,6 +174,9 @@ def training_loop(model: BINN,
                   device, 
                   scheduler, 
                   epochs:int) -> None:
+    """
+    Performs the entire training & testing loop over the epochs
+    """
     
     for epoch in range(epochs):
         train_loss, train_acc = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
