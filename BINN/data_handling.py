@@ -11,11 +11,6 @@ import torch
 from BINN import Binn
 import binn_training as bt
 
-# GLOBALS
-ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
-              for i in range(5)]
-
 def data_concatenate(acollection : AnnCollection):
     """
     Concatenate the AnnCollection to a single AnnData object
@@ -85,7 +80,7 @@ def read_masks(mask_paths, print_shapes=False) -> dict:
             print(f"Matrix {i} shape: {df.shape}")
     return mask_dict
 
-def compute_features(masks:dict, device) -> tuple[list, int, list, list]:
+def compute_features(masks:dict, device) -> tuple[int, list, list]:
     #Extracting pure number representation matrices
     mask_matrix_list = [masks[mask].to_numpy() for mask in masks]
     # Starting amount of features
@@ -98,7 +93,7 @@ def compute_features(masks:dict, device) -> tuple[list, int, list, list]:
     # Put on device
     tensor_masks = [mask.to(device) for mask in tensor_masks]
 
-    return mask_matrix_list, in_features, layers_list, tensor_masks
+    return in_features, layers_list, tensor_masks
 
 def subset_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
     """
@@ -184,6 +179,13 @@ data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
 comp_proc_data_path = "/data/users/thomath/kand/data/processed_data/extracted_from_completed/"
 
 def pipeline() -> None:
+    # GLOBALS
+    EPOCHS = 30
+    TRAIN_SIZE = 0.8
+    ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
+    MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+                for i in range(5)]
+
     print("Fetching device...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -191,7 +193,10 @@ def pipeline() -> None:
     masks = read_masks(MASK_PATHS)
 
     print("Computing BINN features...")
-    mask_matrix_list, in_features, layers_list, tensor_masks = compute_features(masks, device)
+    in_features, layers_list, tensor_masks = compute_features(masks, device)
+
+    print("Creating BINN...")
+    model, criterion, optimizer = create_model(in_features, layers_list, tensor_masks, device)
 
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=comp_proc_data_path)
@@ -201,6 +206,18 @@ def pipeline() -> None:
 
     print("Padding adatas to BINN-ready shape...")
     datasets_padded = pad_align_data(datasets_aligend, masks["df0"])
+
+    print("Creating AnnCollection...")
+    acollection = ctts.create_encoded_collection(datasets_padded)
+
+    print("Creating train/test split...")
+    train_adata, test_adata = ctts.custom_train_test_split(acollection, train_size=TRAIN_SIZE)
+
+    print("Getting dataloaders...")
+    train_loader, test_loader = create_dataloaders(train_adata, test_adata)
+
+    print("Running train/test loop")
+    training_loop(model, train_loader, test_loader, criterion, optimizer, device, EPOCHS)
 
     # ONLY RUN ONCE ON LARGE FILES
     #print("Processing datasets...")
