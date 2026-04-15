@@ -1,7 +1,7 @@
 import pandas as pd
 import custom_train_test_split
-import train_loader
-from train_loader import read_adata, xy_datasplit
+import BINN.valentino.train_loader as train_loader
+from BINN.valentino.train_loader import read_adata, xy_datasplit
 
 # First mask matrix file
 df1 = pd.read_csv('~/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_0_mask.csv',index_col=0)
