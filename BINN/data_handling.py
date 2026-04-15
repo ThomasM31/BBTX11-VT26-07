@@ -95,7 +95,7 @@ def read_masks(mask_paths, print_shapes=False) -> dict:
             print(f"Matrix {i} shape: {df.shape}")
     return mask_dict
 
-def align_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
+def subset_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
     """
     Subsets the adatas to only include genes present in BINN.
     Drops any HVGs that are not part of the BINN's pathways.
@@ -118,7 +118,7 @@ def align_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
 
     return datasets_aligned
 
-def pad_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
+def pad_align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
     """
     Pads the adatas with sparse zero vectors for missing target genes,
     returns: adatas sorted in alphabetical order. 
@@ -166,10 +166,10 @@ def pipeline() -> None:
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=comp_proc_data_path)
 
     print("Aligning adatas to BINN...")
-    datasets_aligend = align_genes(datasets, masks['df0'])
+    datasets_aligend = subset_genes(datasets, masks['df0'])
 
     print("Padding adatas to BINN-ready shape...")
-    datasets_padded = pad_data(datasets_aligend, masks["df0"])
+    datasets_padded = pad_align_data(datasets_aligend, masks["df0"])
 
     # ONLY RUN ONCE ON LARGE FILES
     #print("Processing datasets...")
