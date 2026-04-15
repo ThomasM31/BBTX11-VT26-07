@@ -159,13 +159,24 @@ def create_model(in_features:int, layers_list:list, tensor_masks:list, device, o
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
 
-    return model, criterion, optimizer
+    return model, criterion, optimizer, scheduler
 
-def training_loop(model:BINN, train_loader, test_loader, criterion, optimizer, device, epochs:int) -> None:
+def training_loop(model: BINN, 
+                  train_loader: AnnLoader, 
+                  test_loader: AnnLoader, 
+                  criterion, 
+                  optimizer, 
+                  device, 
+                  scheduler, 
+                  epochs:int) -> None:
+    
     for epoch in range(epochs):
         train_loss, train_acc = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
         test_loss, test_acc = bt.test_one_epoch(model, test_loader, criterion, device)
+        
+        scheduler.step(test_loss)
         
         print(f"Epoch {epoch+1} / {epochs}")
         print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
@@ -195,7 +206,7 @@ def pipeline() -> None:
     in_features, layers_list, tensor_masks = compute_features(masks, device)
 
     print("Creating BINN...")
-    model, criterion, optimizer = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
+    model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
 
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=comp_proc_data_path)
@@ -216,7 +227,7 @@ def pipeline() -> None:
     train_loader, test_loader = create_dataloaders(train_adata, test_adata)
 
     print("Running train/test loop")
-    training_loop(model, train_loader, test_loader, criterion, optimizer, device, EPOCHS)
+    training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, EPOCHS)
 
     # ONLY RUN ONCE ON LARGE FILES
     #print("Processing datasets...")
