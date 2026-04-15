@@ -47,6 +47,16 @@ def read_files(datasets: dict, filepath: str) -> None:
 
     return datasets
 
+def read_intermediate(datasets: dict, filepath: str) -> None:
+    '''
+    To read a file saved at any stage of processing ('label.h5ad').
+    '''
+    for label, dataset in datasets.items():
+        print(f'Reading: {label}')
+        f = os.path.join(filepath,f'{label}.h5ad')
+        datasets[label] = ad.read_h5ad(f)
+        print(datasets[label])
+
 def read_hvg_adata(datasets: dict, filepath: str) -> None:
     p = os.path.join(filepath, 'processed_data/hvg')
 
@@ -158,6 +168,51 @@ def filter_genes(
         new_genes = datasets[label].n_vars
         print(f"{label}: {old_genes} -> {new_genes} genes (removed {old_genes - new_genes})")
 
+def filter_non_reactome_genes(
+        datasets: dict,
+        filepath: str,
+        filename: str
+        ) -> None:
+    '''
+    Exclude genes that are not present in the Reactome database.
+    This so that we will not have genes in our final training data 
+    that are not connected to a pathway or process in the neural network.
+    '''
+
+    print(f'Filtering out genes not present in Reactome.')
+
+    def extract_reactome_genes(filepath: str, filename: str) -> list[str]:
+        # Read GMT-files to extract all genes in reactome database
+        # GMT files contain entries with:
+        # pathway name | pathway ID | list of associated genes
+
+        full_path_gmt = os.path.join(filepath, filename)
+
+        all_genes = set()
+        with open(full_path_gmt, 'r') as f:
+            for line in f:
+                parts = line.strip().split('\t')
+                pathway_id = parts[1]
+
+                # only keep entries related to human biology
+                if pathway_id.startswith('R-HSA'):
+                    genes = parts[2:]
+                    for gene in genes:
+                        all_genes.add(gene)
+
+        return list(all_genes)
+    
+    reactome_genes = extract_reactome_genes(filepath, filename)
+    
+    # filter out any genes not present in reactome
+    for label, adata in datasets.items():
+        old_genes = adata.n_vars
+        rel_genes = [g for g in reactome_genes if g in adata.var_names]
+        datasets[label] = adata[:, adata.var_names.isin(reactome_genes)]
+        new_genes = datasets[label].n_vars
+        print(f"{label}: {old_genes} -> {new_genes} genes (removed {old_genes - new_genes})")
+
+    print(f'Reactome gene filtering completed.')
 
 def prep_for_hvg_sel(datasets: dict) -> None:
     for label in list(datasets.keys()):
@@ -239,7 +294,7 @@ def find_common_hvgs(
         min_common: int = 1000, 
         inc_val: int = 3000
         ) -> None:
-    
+
     files = [f.name for f in Path(filepath_from).iterdir() if f.is_file()]
 
     # retain only files with correct cell type for this run
@@ -283,7 +338,12 @@ def find_common_hvgs(
 
     print(f'Found {len(common_hvgs)} common HVGs with n_top_genes={n}')
     
-    included = "_".join(datasets.keys())
+    # prepare filename to save common hvgs
+    # if all cell types are included, for brevity use 'all'
+    if len(list(datasets.keys())) == 9:
+        included = 'all'
+    else:
+        included = "_".join(datasets.keys())
 
     # create text file of all common HVGs
     fname = f'{included}_common_{len(common_hvgs)}.txt'
@@ -409,6 +469,12 @@ def add_metadata(datasets: dict, filepath: str, is_float=True) -> None:
 
         pseudo.obs['AD_status'] = [str(status_map.get(s)) for s in subjects]
         pseudo.obs['AD_status'] = pseudo.obs['AD_status'].astype('category')
+
+def move_pseudo_main(datasets: dict):
+    for label, adata in datasets.items():
+        pseudo = adata.uns['pseudo']
+
+        datasets[label] = ad.AnnData(pseudo)
 
 
 def save_files(datasets: dict, filepath: str, stage:str) -> None:
