@@ -21,7 +21,7 @@ def train_one_epoch(model: BINN,
         # fetch inputs and convert to tensor
         inputs = batch.X.float().to(device)
         # fetch labels and convert to tensor
-        labels = torch.tensor(batch.obs['AD_status']).float().reshape(-1, 1).to(device)
+        labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
 
         # zero parameter gradients
         optimizer.zero_grad()
@@ -64,7 +64,7 @@ def test_one_epoch(model: BINN,
             # fetch inputs and convert to tensor
             inputs = batch.X.float().to(device)
             # fetch labels and convert to tensor
-            labels = torch.tensor(batch.obs['AD_status']).float().reshape(-1, 1).to(device)
+            labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
             
             outputs = model(inputs)
             loss = criterion(outputs, labels)
