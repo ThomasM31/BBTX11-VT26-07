@@ -46,8 +46,8 @@ class BINN(nn.Module):
             # retrieve the correct mask from buffers
             mask = getattr(self, f'mask_{i}')
 
-            # apply masks to the respective layer weights
-            masked_weight = layer.weight * mask
+            # apply masks to the respective layer weights, transpose to fit BINN-structure
+            masked_weight = layer.weight * mask.t()
 
             # linear pass :  x * (masked_weights) + bias
             x = F.linear(x, masked_weight, layer.bias)
