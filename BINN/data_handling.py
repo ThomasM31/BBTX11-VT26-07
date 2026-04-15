@@ -53,8 +53,8 @@ def create_dataloaders(train_adata: ad.AnnData,
     """
     Create dataloaders using built in loader for AnnData
     """
-    train_loader = AnnLoader(train_adata, batch_size=batch_size)
-    test_loader = AnnLoader(test_adata, batch_size=batch_size)
+    train_loader = AnnLoader(train_adata, batch_size=batch_size, shuffle=True)
+    test_loader = AnnLoader(test_adata, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
 
 def save_data(datasets: dict, filepath: str) -> None:
@@ -152,7 +152,7 @@ def pad_align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         #print(f"Final shape: {adata_ordered.shape}\n")
     return datasets_padded
 
-def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=0.01):
+def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=0.001):
     model = BINN(in_features=in_features,
                   layers_list=layers_list,
                   mask_list=tensor_masks).to(device)
@@ -195,7 +195,7 @@ def pipeline() -> None:
     in_features, layers_list, tensor_masks = compute_features(masks, device)
 
     print("Creating BINN...")
-    model, criterion, optimizer = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.01)
+    model, criterion, optimizer = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
 
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=comp_proc_data_path)
