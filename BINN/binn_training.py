@@ -21,7 +21,7 @@ def train_one_epoch(model: BINN,
         # fetch inputs and convert to tensor
         inputs = batch.X.float().to(device)
         # fetch labels and convert to tensor
-        labels = torch.tensor(batch.obs['AD_status']).float().reshape(-1, 1).to(device)
+        labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
 
         # zero parameter gradients
         optimizer.zero_grad()
@@ -35,7 +35,7 @@ def train_one_epoch(model: BINN,
         optimizer.step()
 
         # Metrics
-        _, predicted = torch.max(outputs, 1)
+        predicted = (outputs > 0.5).float()
         correct += (predicted == labels).sum().item()
         # .size(0) gets the length of inputs
         running_loss += loss.item() * inputs.size(0)
@@ -57,19 +57,20 @@ def test_one_epoch(model: BINN,
     model.to(device)
     correct = 0
     total = 0
+    running_loss = 0.0
     
     with torch.no_grad():
         for batch in test_loader:
             # fetch inputs and convert to tensor
             inputs = batch.X.float().to(device)
             # fetch labels and convert to tensor
-            labels = torch.tensor(batch.obs['AD_status']).float().reshape(-1, 1).to(device)
+            labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
             
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             
             running_loss += loss.item() * inputs.size(0)
-            _, predicted = torch.max(outputs, 1)
+            predicted = (outputs > 0.5).float()
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
     
