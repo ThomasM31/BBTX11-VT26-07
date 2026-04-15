@@ -55,6 +55,8 @@ def test_one_epoch(model: BINN,
     """
     model.eval()
     model.to(device)
+    running_loss = 0.0
+
     correct = 0
     total = 0
     
