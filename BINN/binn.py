@@ -43,7 +43,7 @@ class BINN(nn.Module):
 
             # Create BatchNorm, except for final layer
             if layer_size > 1:
-                self.batch_norms.append(nn.BatchNorm1d(layer_size))
+                self.batch_norms.append(nn.BatchNorm1d(layer_size, eps=1e-3, momentum=0.01))
 
             current_in_features = layer_size
 
