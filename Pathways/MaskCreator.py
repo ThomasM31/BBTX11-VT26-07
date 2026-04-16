@@ -329,7 +329,7 @@ class PathwayNetwork:
 # pathway-pathway connections
 CONNECTIVITY_FILE = '/data/shared/alzgene26/PathwayData/binn_connectivity.csv'
 
-def main(INPUT_DIR: str, OUTPUT_DIR:str, several_datasets: bool):
+def main(INPUT_DIR: str, OUTPUT_DIR:str, several_datasets: bool, mask_label: str):
     print("=== STARTING FULL MASK GENERATION ===")
     
     # Read the network connectivities
@@ -398,7 +398,8 @@ def main(INPUT_DIR: str, OUTPUT_DIR:str, several_datasets: bool):
         # process only first file (as gene set is same for all files)
         cell_files_stripped = [c.removesuffix('.h5ad') for c in cell_files]
         save_str = "_".join(cell_files_stripped)
-        _do_mask_creation(cell_files[0], save_str, data_info)
+        to_mask_from = f'{mask_label}.h5ad'
+        _do_mask_creation(to_mask_from, save_str, data_info)
 
     
 
@@ -427,10 +428,19 @@ if __name__ == "__main__":
         help="If True prepares mask matrixes for all files in a folder (if gene set is different for files / cell types)"
     )
 
+    # Optional argument
+    parser.add_argument(
+        "--mask_label", 
+        type=str,
+        default='exc3',
+        help="label for cell type to mask from"
+    )
+
     args = parser.parse_args()
 
     filepath_in = args.filepath_in
     filepath_out = args.filepath_out
     several_datasets = args.several_datasets
+    mask_label = args.mask_label
 
-    main(filepath_in, filepath_out, several_datasets)
+    main(filepath_in, filepath_out, several_datasets, mask_label)

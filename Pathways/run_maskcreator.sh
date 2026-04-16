@@ -50,6 +50,13 @@ else
     echo "FAILURE: Task $SLURM_ARRAY_TASK_ID exited with code $EXIT_CODE at $END_TIME" >> $STATUS_LOG
 fi
 
+# print snapshot of error to terminal
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "--- ERROR LOG SNAPSHOT ---"
+    cat "logs/hvgs_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.err"
+    echo "--------------------------"
+fi
+
 echo "------------------------------------------------------------"
 echo "FINISHED: $END_TIME"
 echo "------------------------------------------------------------"
