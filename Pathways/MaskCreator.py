@@ -325,13 +325,10 @@ class PathwayNetwork:
         return matrices
 
 
-# Path to file with description of gene-pathway connections and
-# pathway-pathway connections
-CONNECTIVITY_FILE = '/data/shared/alzgene26/PathwayData/binn_connectivity.csv'
 
-def main(INPUT_DIR: str, OUTPUT_DIR:str, several_datasets: bool, mask_label: str):
+def main(INPUT_DIR: Path, OUTPUT_DIR: Path, CONNECTIVITY_FILE: Path, several_datasets: bool, mask_label: str):
     print("=== STARTING FULL MASK GENERATION ===")
-    
+
     # Read the network connectivities
     # includes both gene to pathway and pathway to pathway
     print("Reading connectivities")
@@ -352,17 +349,14 @@ def main(INPUT_DIR: str, OUTPUT_DIR:str, several_datasets: bool, mask_label: str
     pathway_pathway_mapping = list(pathway_pathway_mapping.itertuples(index=False, name=None))
     gene_pathway_mapping = list(gene_pathway_mapping.itertuples(index=False, name=None))
 
-    # Find all cell types (.h5ad-files)
-    cell_files = [f for f in os.listdir(INPUT_DIR) if f.endswith('.h5ad')]
-    print(f"Found {len(cell_files)} cell types to process.\n")
-
-    def _do_mask_creation(file_name: str, save_str: str, data_info: str) -> None:
-        cell_name = file_name.removesuffix('.h5ad')
+    def _do_mask_creation(file: str, save_str: str, data_info: str) -> None:
+        cell_name = file.removesuffix('.h5ad')
         print(f">>> Processing: {cell_name}")
         
         try:
             # Read AnnData
-            adata = sc.read_h5ad(os.path.join(INPUT_DIR, file_name), backed='r')
+            f = INPUT_DIR / file
+            adata = sc.read_h5ad(f, backed='r')
             # Extract all relevant genes, convert to set for faster lookup
             gene_set = set(adata.var_names.tolist())
             
@@ -375,29 +369,31 @@ def main(INPUT_DIR: str, OUTPUT_DIR:str, several_datasets: bool, mask_label: str
             # Generate matrixes NOTE: (4 layers, change later?)
             matrices = pn.get_connectivity_matrices(n_layers=4)
             
-            out_path_with_info = os.path.join(OUTPUT_DIR, data_info)
             for i, m in enumerate(matrices):
-                if save_str == '':
-                    out_path = Path(os.path.join(out_path_with_info, f"{cell_name}_layer_{i}_mask.csv"))
-                    out_path.parent.mkdir(parents=True, exist_ok=True)
-                else:
-                    out_path = Path(os.path.join(out_path_with_info, f"{save_str}_layer_{i}_mask.csv"))
-                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                save_name = save_str if save_str != '' else cell_name 
+                out_path = OUTPUT_DIR / data_info / f"{save_name}_layer_{i}_mask.csv"
+                out_path.parent.mkdir(parents=True, exist_ok=True)
                 m.to_csv(out_path)
-                print(f"      Saved: {out_path} (Shape: {m.shape})")
+                print(f"      Saved: {out_path} (Shape: {m.shape}) to {out_path}")
                 
         except Exception as e:
             print(f"      [ERROR] could not process {cell_name}: {e}")
     
-    data_info = INPUT_DIR.split('/')[-1]
+    
+    # Find all cell types (.h5ad-files)
+    cell_files = [f for f in os.listdir(INPUT_DIR) if f.endswith('.h5ad')]
+    print(f"Found {len(cell_files)} cell types. \n")
+
+    # get the directory name (has info on vars used to create processed files)
+    data_info = INPUT_DIR.parts[-1]
     if several_datasets:
         for file_name in cell_files:
             _do_mask_creation(file_name, '', data_info)
             print("\n=== ALL CELL TYPES PROCESSED ===")
     else:
-        # process only first file (as gene set is same for all files)
         cell_files_stripped = [c.removesuffix('.h5ad') for c in cell_files]
         save_str = "_".join(cell_files_stripped)
+        # we select which cell type to make the mask from (some may have fewer than n_top HVGs)
         to_mask_from = f'{mask_label}.h5ad'
         _do_mask_creation(to_mask_from, save_str, data_info)
 
@@ -410,14 +406,20 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "filepath_in", 
-        type=str,
+        type=Path,
         help="Filepath to read from"
     )
 
     parser.add_argument(
         "filepath_out", 
-        type=str,
+        type=Path,
         help="Filepath to output masks to"
+    )
+
+    parser.add_argument(
+        "connectivity_file", 
+        type=Path,
+        help="File with gene-pathway and pathway-pathway connections"
     )
 
     # Optional argument
@@ -440,7 +442,8 @@ if __name__ == "__main__":
 
     filepath_in = args.filepath_in
     filepath_out = args.filepath_out
+    connectivity_file = args.connectivity_file
     several_datasets = args.several_datasets
     mask_label = args.mask_label
 
-    main(filepath_in, filepath_out, several_datasets, mask_label)
+    main(filepath_in, filepath_out, connectivity_file, several_datasets, mask_label)

@@ -35,9 +35,10 @@ export PYTHONUNBUFFERED=1
 
 INPUT_DIR="/data/shared/alzgene26/data/processed_data/completed/mg_200_mc_200_mhvg1000"
 OUTPUT_DIR="/data/shared/alzgene26/PathwayData/MaskMatrixLayers"
+CONNECTIVITY_FILE="/data/shared/alzgene26/PathwayData/binn_connectivity.csv"
 
 # Run the Python script
-time python3 -u MaskCreator.py "$INPUT_DIR" "$OUTPUT_DIR"
+time python3 -u MaskCreator.py "$INPUT_DIR" "$OUTPUT_DIR" "$CONNECTIVITY_FILE"
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?
