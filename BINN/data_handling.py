@@ -53,8 +53,8 @@ def create_dataloaders(train_adata: ad.AnnData,
     """
     Create dataloaders using built in loader for AnnData
     """
-    train_loader = AnnLoader(train_adata, batch_size=batch_size)
-    test_loader = AnnLoader(test_adata, batch_size=batch_size)
+    train_loader = AnnLoader(train_adata, batch_size=batch_size, shuffle=True)
+    test_loader = AnnLoader(test_adata, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
 
 def save_data(datasets: dict, filepath: str) -> None:
@@ -152,22 +152,39 @@ def pad_align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         #print(f"Final shape: {adata_ordered.shape}\n")
     return datasets_padded
 
-def create_model(in_features:int, layers_list:list, tensor_masks:list, device):
+def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=0.001):
+    """
+    Instantiate BINN and accompanying criterion, optimizer and scheduler
+    """
     model = BINN(in_features=in_features,
                   layers_list=layers_list,
                   mask_list=tensor_masks).to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
 
-    return model, criterion, optimizer
+    return model, criterion, optimizer, scheduler
 
-def training_loop(model:BINN, train_loader, test_loader, criterion, optimizer, device, epochs:int) -> None:
+def training_loop(model: BINN, 
+                  train_loader: AnnLoader, 
+                  test_loader: AnnLoader, 
+                  criterion, 
+                  optimizer, 
+                  device, 
+                  scheduler, 
+                  epochs:int) -> None:
+    """
+    Performs the entire training & testing loop over the epochs
+    """
+    
     for epoch in range(epochs):
         train_loss, train_acc = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
         test_loss, test_acc = bt.test_one_epoch(model, test_loader, criterion, device)
         
-        print(f"Epoch {epoch+1} / {5}")
+        scheduler.step(test_loss)
+        
+        print(f"Epoch {epoch+1} / {epochs}")
         print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
         print(f"Test Loss:  {test_loss:.4f} | Test Acc:  {test_acc:.4f}")
         print("-" * 30)
@@ -179,7 +196,7 @@ comp_proc_data_path = "/data/users/thomath/kand/data/processed_data/extracted_fr
 
 def pipeline() -> None:
     # GLOBALS
-    EPOCHS = 30
+    EPOCHS = 15
     TRAIN_SIZE = 0.8
     ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
     MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
@@ -195,7 +212,7 @@ def pipeline() -> None:
     in_features, layers_list, tensor_masks = compute_features(masks, device)
 
     print("Creating BINN...")
-    model, criterion, optimizer = create_model(in_features, layers_list, tensor_masks, device)
+    model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
 
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=comp_proc_data_path)
@@ -216,7 +233,7 @@ def pipeline() -> None:
     train_loader, test_loader = create_dataloaders(train_adata, test_adata)
 
     print("Running train/test loop")
-    training_loop(model, train_loader, test_loader, criterion, optimizer, device, EPOCHS)
+    training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, EPOCHS)
 
     # ONLY RUN ONCE ON LARGE FILES
     #print("Processing datasets...")
@@ -227,5 +244,5 @@ def pipeline() -> None:
     print("Pipeline completed!")
 
 if __name__ == "__main__":
-    #pipeline()
-    pass
+    pipeline()
+
