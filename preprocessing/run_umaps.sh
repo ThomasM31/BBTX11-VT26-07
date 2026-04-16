@@ -8,6 +8,7 @@
 #SBATCH --mem=16G
 #SBATCH --array=0-8
 
+
 # --- LOGGING SETUP ---
 # %A = Master Job ID | %a = Array Index ID
 # This creates one log file per task (e.g., logs/hvgs_12345_0.out)
@@ -36,7 +37,7 @@ export PYTHONUNBUFFERED=1
 
 # Run the Python script
 # We use 'time' to see how long the Python process actually took
-time python3 -u pipeline.py $SLURM_ARRAY_TASK_ID --draw_umaps True
+time python3 -u draw_umaps_pipeline.py $SLURM_ARRAY_TASK_ID "$1"
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?

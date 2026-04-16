@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 import argparse
 
@@ -27,7 +26,7 @@ def get_datasets(included_labels: list) -> dict:
     }
     return datasets
 
-def read_files(datasets: dict, filepath: str) -> None:
+def read_files(datasets: dict, filepath: Path) -> None:
 
     files = {'astro'  : 'Astrocytes.h5ad',
              'exc1'   : 'Excitatory_neurons_set1.h5ad',
@@ -39,32 +38,24 @@ def read_files(datasets: dict, filepath: str) -> None:
              'opcs'   : 'OPCs.h5ad',
              'vasc'   : 'Vasculature_cells.h5ad'}
 
-    for label in list(datasets.keys()):
+    for label in datasets.keys():
         print(f'Reading: {label}')
-        f = os.path.join(filepath, files[label])
+        f = filepath / files[label]
         datasets[label] = ad.read_h5ad(f)
         print(datasets[label])
 
     return datasets
 
-def read_intermediate(datasets: dict, filepath: str) -> None:
+def read_intermediate(datasets: dict, filepath: Path) -> None:
     '''
     To read a file saved at any stage of processing ('label.h5ad').
     '''
     for label, dataset in datasets.items():
         print(f'Reading: {label}')
-        f = os.path.join(filepath,f'{label}.h5ad')
+        f = filepath / f'{label}.h5ad'
         datasets[label] = ad.read_h5ad(f)
         print(datasets[label])
 
-def read_hvg_adata(datasets: dict, filepath: str) -> None:
-    p = os.path.join(filepath, 'processed_data/hvg')
-
-    for label in list(datasets.keys()):
-        print(f'Reading: {label}')
-        f = os.path.join(p,f'{label}.h5ad')
-        datasets[label] = ad.read_h5ad(f)
-        print(datasets[label])
 
 def filter_cells_by_min_genes(datasets: dict, min_genes: int=200) -> None:
     for label, adata in datasets.items():
@@ -93,19 +84,19 @@ def filter_cells_by_mitochondrial_content(datasets: dict, mt_threshold: float=5.
         print(f"{label}: {old_cells} -> {adata.n_obs} cells (removed {old_cells - adata.n_obs})")
 
 
-def write_gene_expr_count(datasets: dict, filepath: str) -> None:
+def write_gene_expr_count(datasets: dict, filepath: Path) -> None:
 
     for label, adata in datasets.items():
         # counts how many cells expresses each gene
         sc.pp.filter_genes(adata, min_cells=0)
         counts = adata.var['n_cells'].tolist()
 
-        to = os.path.join(filepath, f'{label}.csv')
-        adata.var['n_cells'].to_csv(to)
+        f = filepath / f'{label}.csv'
+        adata.var['n_cells'].to_csv(f)
 
-def read_gene_expr_count(datasets: dict, filepath: str) -> list:
+def read_gene_expr_count(datasets: dict, filepath: Path) -> list:
     
-    files = [f.name for f in Path(filepath).iterdir() if f.is_file()]
+    files = [f.name for f in filepath.iterdir() if f.is_file()]
     
     # correct cell type for this run
     rel_files = []
@@ -119,7 +110,7 @@ def read_gene_expr_count(datasets: dict, filepath: str) -> list:
     counts_list = []
 
     for i, file in enumerate(rel_files):
-        to_read = os.path.join(filepath, file)
+        to_read = filepath / file
         counts = pd.read_csv(to_read, index_col=0).iloc[:, 0]
         counts_list.append(counts)
         
@@ -127,8 +118,8 @@ def read_gene_expr_count(datasets: dict, filepath: str) -> list:
 
 def sum_gene_expr_counts(
         datasets: dict, 
-        filepath_from: str, 
-        filepath_to: str, 
+        filepath_from: Path, 
+        filepath_to: Path, 
         min_cells: int
         ) -> None:
     '''
@@ -141,14 +132,14 @@ def sum_gene_expr_counts(
     total_counts = pd.concat(counts_list, axis = 1).sum(axis = 1)
     genes_to_keep = total_counts[total_counts >= min_cells].index
  
-    to = os.path.join(filepath_to, f'genes_to_keep_{min_cells}.csv')
+    to = filepath_to / f'genes_to_keep_{min_cells}.csv'
         
     pd.Series(genes_to_keep, name='gene_ids').to_csv(to, index=False)
 
 
 def filter_genes(
         datasets: dict, 
-        filepath: str, 
+        filepath: Path, 
         min_cells: int=200
         ) -> None:
     '''
@@ -160,7 +151,7 @@ def filter_genes(
     '''
     print(f'Filtering out genes expressed in <{min_cells} cells.')
 
-    to_read = os.path.join(filepath, f'genes_to_keep_{min_cells}.csv')
+    to_read = filepath / f'genes_to_keep_{min_cells}.csv'
     genes_to_keep = pd.read_csv(to_read)
     genes_to_keep = genes_to_keep['gene_ids'].tolist()
 
@@ -174,8 +165,8 @@ def filter_genes(
 
 def filter_non_reactome_genes(
         datasets: dict,
-        filepath: str,
-        filename: str
+        filepath: Path,
+        filename: Path
         ) -> None:
     '''
     Exclude genes that are not present in the Reactome database.
@@ -185,16 +176,16 @@ def filter_non_reactome_genes(
 
     print(f'Filtering out genes not present in Reactome.')
 
-    def extract_reactome_genes(filepath: str, filename: str) -> list[str]:
+    def extract_reactome_genes(filepath: Path, filename: str) -> list[str]:
         # Read GMT-files to extract all genes in reactome database
         # GMT files contain entries with:
         # pathway name | pathway ID | list of associated genes
 
-        full_path_gmt = os.path.join(filepath, filename)
+        f = filepath / filename
 
         all_genes = set()
-        with open(full_path_gmt, 'r') as f:
-            for line in f:
+        with open(f, 'r') as lines:
+            for line in lines:
                 parts = line.strip().split('\t')
                 pathway_id = parts[1]
 
@@ -237,7 +228,7 @@ def prep_for_hvg_sel(datasets: dict) -> None:
 
 def extract_per_cell_type_hvgs(
         datasets: dict, 
-        filepath: str, 
+        filepath: Path, 
         n_top_genes: int
         ) -> None:
     '''
@@ -260,7 +251,7 @@ def extract_per_cell_type_hvgs(
         # save list of hvgs as textfile
         # will allow us to find common hvgs later
         fname = f'{label}_ntop_{n_top_genes}.txt'
-        to = os.path.join(filepath, fname)
+        to = filepath / fname
         with open(to, 'w') as output:
             for gene in hvg_per_type:
                 output.write(str(gene) + '\n')
@@ -270,7 +261,7 @@ def extract_per_cell_type_hvgs(
         print(f'Writing HVGs for {label}')
         print(datasets[label].uns['hvg'])
 
-def extract_hvgs_full_list(datasets: dict, filepath: str):
+def extract_hvgs_full_list(datasets: dict, filepath: Path):
     '''
     Writes all genes to text file in order of descending variability.
     '''
@@ -284,7 +275,7 @@ def extract_hvgs_full_list(datasets: dict, filepath: str):
         # save list of hvgs as textfile
         # will allow us to find common hvgs later
         fname = f'{label}.txt'
-        to = os.path.join(filepath, fname)
+        to = filepath / fname
         with open(to, 'w') as output:
             for gene in sorted_genes:
                 output.write(str(gene) + '\n')
@@ -292,14 +283,14 @@ def extract_hvgs_full_list(datasets: dict, filepath: str):
 
 def find_common_hvgs(
         datasets: dict, 
-        filepath_from: str, 
-        filepath_to: str,  
+        filepath_from: Path, 
+        filepath_to: Path,  
         n_top_genes: int, 
         min_common: int = 1000, 
         inc_val: int = 3000
         ) -> None:
 
-    files = [f.name for f in Path(filepath_from).iterdir() if f.is_file()]
+    files = [f.name for f in filepath_from.iterdir() if f.is_file()]
 
     # retain only files with correct cell type for this run
     rel_files = []
@@ -310,7 +301,7 @@ def find_common_hvgs(
     
     hvgs = []  
     for i, file in enumerate(rel_files):
-        path = os.path.join(filepath_from, file)
+        path = filepath_from / file
         with open(path, 'r') as input:
             genes = input.readlines()
             hvgs.append([g.strip('\n') for g in genes])
@@ -351,15 +342,15 @@ def find_common_hvgs(
 
     # create text file of all common HVGs
     fname = f'{included}_common_{len(common_hvgs)}.txt'
-    to = os.path.join(filepath_to, fname)
+    to = filepath_to / fname
     with open(to, 'w') as output:
         for gene in common_hvgs:
             output.write(str(gene) + '\n')
 
     
-def filter_common_hvgs(datasets: dict, filepath: str, hvg_file:str) -> None:
+def filter_common_hvgs(datasets: dict, filepath: Path, hvg_file:str) -> None:
     
-    path = os.path.join(filepath, hvg_file)
+    path = filepath / hvg_file
     with open(path, 'r') as input:
         genes = input.readlines()
         common_hvgs = [g.strip('\n') for g in genes]
@@ -410,46 +401,61 @@ def normalize(datasets: dict) -> None:
         print(adata)
         print(f'{label:<8} has min: {adata.X.min():.2f} and max: {adata.X.max():.2f}')
 
+def draw_umaps_logic(adata_orig, adata_proc, label: str, filepath: Path) -> None:
+    print(f'Drawing umaps for {label}')
 
-def draw_umaps(datasets: dict, filepath: str) -> None:
+    fname1 = filepath / f'{label}_orig'
+    fname2 = filepath / f'{label}_proc'
+
+    # UMAP for original
+    sc.tl.pca(adata_orig, svd_solver='arpack')
+    sc.pp.neighbors(adata_orig, n_neighbors=20, n_pcs = 30)
+    sc.tl.umap(adata_orig)
+    sc.pl.umap(adata_orig, 
+                title=f"{label} original",
+                color=['cell_type_high_resolution'], 
+                show=False,
+                legend_loc="upper left").figure.savefig(fname1)
+
+    # UMAP for preprocessed
+    sc.tl.pca(adata_proc, svd_solver='arpack')
+    sc.pp.neighbors(adata_proc, n_neighbors=20, n_pcs = 30)
+    sc.tl.umap(adata_proc)
+    sc.pl.umap(adata_proc, 
+                title=f"{label} pre-processed",
+                color=['cell_type_high_resolution'], 
+                show=False,
+                legend_loc="upper left").figure.savefig(fname2)
     
+    print(f"Drawing completed for {label}")
+
+
+def draw_umaps(datasets: dict, filepath: Path) -> None:
+    '''
+    To draw UMAPS while both the original data and 
+    processed data are in the same ad object
+    '''
     for label, adata in datasets.items():
-        adata_orig = datasets[label]
-        adata_proc = datasets[label].uns['pseudo']
-        print(f'Drawing umaps for {label}')
+        adata_orig = adata
+        adata_proc = adata.uns['pseudo']
+        draw_umaps_logic(filepath, adata_orig, adata_proc, label)
         
-        fname1 = f'{label}_orig'
-        fname1 = os.path.join(filepath,fname1)
-        fname2 = f'{label}_proc'
-        fname2 = os.path.join(filepath,fname2)
 
-        # UMAP for original
-        sc.tl.pca(adata_orig, svd_solver='arpack')
-        sc.pp.neighbors(adata_orig, n_neighbors=20, n_pcs = 30)
-        sc.tl.umap(adata_orig)
-        sc.pl.umap(adata_orig, 
-                   title=f"{label} original",
-                   color=['cell_type_high_resolution'], 
-                   show=False,
-                   legend_loc="upper left").figure.savefig(fname1)
-
-        # UMAP for preprocessed
-        sc.tl.pca(adata_proc, svd_solver='arpack')
-        sc.pp.neighbors(adata_proc, n_neighbors=20, n_pcs = 30)
-        sc.tl.umap(adata_proc)
-        sc.pl.umap(adata_proc, 
-                   title=f"{label} pre-processed",
-                   color=['cell_type_high_resolution'], 
-                   show=False,
-                   legend_loc="upper left").figure.savefig(fname2)
-        
-        print(f"Drawing completed for {label}")
+def draw_umaps(datasets_orig: dict, datasets_proc: dict, filepath: Path) -> None:
+    '''
+    To draw UMAPS when original data and processed data are in the main 
+    layers of two separate ad objects
+    '''
+    for label in datasets_orig.keys():
+        adata_orig = datasets_orig[label]
+        adata_proc = datasets_proc[label]
+        draw_umaps_logic(adata_orig, adata_proc, label, filepath)
 
 
-def add_metadata(datasets: dict, filepath: str, is_float=True) -> None:
+def add_metadata(datasets: dict, filepath: Path, is_float=True) -> None:
     # Add subject disease status metadata
     file = 'individual_metadata_deidentified.tsv'
-    p = os.path.join(filepath,file)
+    p = filepath / file
     metadata = pd.read_csv(p,sep='\t')
 
     AD_status_lbl = 'Pathologic_diagnosis_of_AD'
@@ -484,12 +490,12 @@ def move_pseudo_main(datasets: dict):
         print(datasets[label])
 
 
-def save_files(datasets: dict, filepath: str, stage:str) -> None:
+def save_files(datasets: dict, filepath: Path, stage:str) -> None:
     print(f'Writing files at stage "{stage}"')
     
     for label in list(datasets.keys()):
         print(f'Writing "{label}" to file.')
-        to = os.path.join(filepath, f'{label}.h5ad')
+        to = filepath / f'{label}.h5ad'
 
         datasets[label].write_h5ad(to)
 

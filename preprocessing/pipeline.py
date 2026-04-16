@@ -19,47 +19,30 @@ def pipeline(
         base_path = Path("/data/shared/alzgene26/data")
     else:
         ### To read from and write to current users folders
-        #user = os.environ.get('USER') or os.environ.get('USERNAME')
-        #base_path = Path("/data/users") / user / "kand/data/"
-        pass
+        user = os.environ.get('USER') or os.environ.get('USERNAME')
+        base_path = Path("/data/users") / user / "kand/data/"
     
     processed_data = "processed_data"
     run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{min_common_hvgs}' 
 
-    conv_data_path          = base_path / "conv_data"
-    gene_expr_count_path    = base_path / processed_data / "expr_counts"
-    genes_keep_path         = base_path / processed_data / "filter_genes"
-    hvg_lists_path          = base_path / processed_data / "hvg_lists"
-    hvg_common_path         = base_path / processed_data / "hvg_common"
-    figures_path            = base_path / "figures"
-    metadata_path           = base_path / "supplementary_data"
-    completed_path          = base_path / processed_data / "completed" / run_vars
-    test_data_path          = base_path / processed_data / "test_data"
-    pathway_data_path       = base_path / 'PathwayData'
+    paths = {}
+    paths["conv_data_path"]          = base_path / "conv_data"
+    paths["gene_expr_count_path"]    = base_path / processed_data / "expr_counts"
+    paths["genes_keep_path"]         = base_path / processed_data / "filter_genes"
+    paths["hvg_lists_path"]          = base_path / processed_data / "hvg_lists"
+    paths["hvg_common_path"]         = base_path / processed_data / "hvg_common"
+    paths["figures_path"]            = base_path / "figures"
+    paths["metadata_path"]           = base_path / "supplementary_data"
+    paths["completed_path"]          = base_path / processed_data / "completed" / run_vars
+    paths["test_data_path"]          = base_path / processed_data / "test_data"
+    paths["pathway_data_path"]       = base_path / 'PathwayData'
 
     # create folders if they do not exist
-    gene_expr_count_path.mkdir(parents=True, exist_ok=True)
-    genes_keep_path.mkdir(parents=True, exist_ok=True)
-    hvg_lists_path.mkdir(parents=True, exist_ok=True)
-    hvg_common_path.mkdir(parents=True, exist_ok=True)
-    figures_path.mkdir(parents=True, exist_ok=True)
-    completed_path.mkdir(parents=True, exist_ok=True)
-    test_data_path.mkdir(parents=True, exist_ok=True)
-    pathway_data_path.mkdir(parents=True, exist_ok=True)
-
-    conv_data_path           = str(conv_data_path)
-    gene_expr_count_path    = str(gene_expr_count_path)
-    genes_keep_path         = str(genes_keep_path)
-    hvg_lists_path          = str(hvg_lists_path)
-    hvg_common_path         = str(hvg_common_path)
-    figures_path            = str(figures_path)
-    metadata_path           = str(metadata_path)
-    completed_path          = str(completed_path)
-    test_data_path          = str(test_data_path)
-    pathway_data_path          = str(pathway_data_path)
-
-    filepath = str(base_path)
-
+    for path_name, path  in paths.items():
+        path.mkdir(parents=True, exist_ok=True)
+        
+    #-------START PROCESSING-------
+    
     # from int to readable labels
     included_labels = pre.get_labels(to_include)
 
@@ -67,25 +50,25 @@ def pipeline(
     datasets = pre.get_datasets(included_labels)
 
     # read h5ad files, add to datasets dict
-    pre.read_files(datasets, conv_data_path)
+    pre.read_files(datasets, paths["conv_data_path"])
 
     #-------FILTERING PREP FOR PER GENE FILTERING-------
     
     for label, adata in datasets.items():
-        f = os.path.join(gene_expr_count_path, f'{label}.csv')
-        if not Path(f).exists():
+        f = paths["gene_expr_count_path"] / f'{label}.csv'
+        if not f.exists():
             # writes gene expression count per dataset to .csv
             d = {label:adata}
-            pre.write_gene_expr_count(d, gene_expr_count_path)
+            pre.write_gene_expr_count(d, paths["gene_expr_count_path"])
 
-    f = os.path.join(genes_keep_path, f'genes_to_keep_{min_cells}.csv')
-    if not Path(f).exists():
+    f = paths["genes_keep_path"] / f'genes_to_keep_{min_cells}.csv'
+    if not f.exists():
         # sum gene expression counts for all datasets, 
         # list all genes that are expressed in more than min_cells in .csv
         pre.sum_gene_expr_counts(
             datasets, 
-            gene_expr_count_path, 
-            genes_keep_path, 
+            paths["gene_expr_count_path"], 
+            paths["genes_keep_path"], 
             min_cells)
 
     #-------PERFORM FILTERING-------
@@ -101,10 +84,10 @@ def pipeline(
     #pre.filter_cells_by_mitochondrial_content(datasets)
 
     # filter lowly expressed genes
-    pre.filter_genes(datasets, genes_keep_path, min_cells)
+    pre.filter_genes(datasets, paths["genes_keep_path"], min_cells)
 
     # filter genes that don't exist in Reactome
-    pre.filter_non_reactome_genes(datasets, pathway_data_path, 'ReactomePathways.gmt')
+    pre.filter_non_reactome_genes(datasets, paths["pathway_data_path"], 'ReactomePathways.gmt')
 
     #-------FIND AND FILTER HVGs-------
     
@@ -112,11 +95,10 @@ def pipeline(
     # genes sorted from most to least variable
     # this method does not require normalized data
     for label, adata in datasets.items():
-        
-        f = os.path.join(hvg_lists_path, f'{label}.txt')
-        if not Path(f).exists():
+        f = paths["hvg_lists_path"] / f'{label}.txt'
+        if not f.exists():
             d = {label:adata}
-            pre.extract_hvgs_full_list(d, hvg_lists_path)
+            pre.extract_hvgs_full_list(d, paths["hvg_lists_path"])
 
     # prepare filename to save common hvgs
     # if all cell types are included, for brevity use 'all'
@@ -125,21 +107,21 @@ def pipeline(
     else:
         included = "_".join(datasets.keys())
     hvg_file = f'{included}_common_{min_common_hvgs}.txt'
-    f = os.path.join(hvg_common_path, hvg_file)
+    f = paths["hvg_common_path"] / hvg_file
     
     # Find n_top common hvgs from txt files
-    if not Path(f).exists():
+    if not f.exists():
         pre.find_common_hvgs(
             datasets, 
-            hvg_lists_path, 
-            hvg_common_path, 
+            paths["hvg_lists_path"], 
+            paths["hvg_common_path"], 
             n_top_genes, 
             min_common_hvgs, 
             common_hvg_inc_value
             )
 
     # filter by common hvgs
-    pre.filter_common_hvgs(datasets, hvg_common_path, hvg_file)
+    pre.filter_common_hvgs(datasets, paths["hvg_common_path"], hvg_file)
 
     #-------PSEUDOBULK AND NORMALIZE-------
 
@@ -152,14 +134,14 @@ def pipeline(
     #-------ADD METADATA-------
 
     # add disease status
-    pre.add_metadata(datasets, metadata_path)
+    pre.add_metadata(datasets, paths["metadata_path"])
 
     #-------UMAPS-------
 
     # visualize how the preprocessing has improved (?) 
     # separation of cells (slow and uses a lot of memory!!)
     # for this one it is better to load each data set separately
-    #if draw_umaps: pre.draw_umaps(datasets=datasets, filepath=figures_path)
+    if draw_umaps: pre.draw_umaps(datasets=datasets, filepath=path["figures_path"])
 
     #-------MOVE PROCESSED DATA TO MAIN LAYER AND SAVE-------
     
@@ -167,7 +149,7 @@ def pipeline(
     # this will make the files a lot smaller
     pre.move_pseudo_main(datasets)
 
-    pre.save_files(datasets, completed_path, 'completed')
+    pre.save_files(datasets, paths["completed_path"], 'completed')
 
     print('Pipeline completed')
 
