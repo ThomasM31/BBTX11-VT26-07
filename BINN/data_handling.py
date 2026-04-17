@@ -105,8 +105,8 @@ def subset_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
     for label in list(datasets.keys()):
         adata = datasets[label]
         # Find the intersection of genes
-        overlapping_genes = list(set(adata.var_names) & set(target_genes))
-        
+        overlapping_genes = [g for g in target_genes if g in adata.var_names]
+
         # Subset the dataset
         adata_aligned = adata[:, overlapping_genes].copy()
         # Update dictionary
