@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=full_pipeline
+#SBATCH --job-name=preprocessing
 #SBATCH --partition=long
 #SBATCH --time=03:00:00
 #SBATCH --nodes=1
@@ -11,9 +11,9 @@
 # --- LOGGING SETUP ---
 # %A = Master Job ID | %a = Array Index ID
 # This creates one log file per task (e.g., logs/hvgs_12345_0.out)
-#SBATCH --output=logs/preproc_%A_%a.out
+#SBATCH --output=logs/%A_%a_preproc.out
 # This captures errors in a separate file for quicker debugging
-#SBATCH --error=logs/preproc_%A_%a.err
+#SBATCH --error=logs/%A_%a_preproc.err
 
 # Ensure directory exists
 mkdir -p logs

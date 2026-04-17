@@ -12,9 +12,9 @@
 # --- LOGGING SETUP ---
 # %A = Master Job ID | %a = Array Index ID
 # This creates one log file per task (e.g., logs/hvgs_12345_0.out)
-#SBATCH --output=logs/draw_umaps_%A_%a.out
+#SBATCH --output=logs/%A_%a_draw_umaps.out
 # This captures errors in a separate file for quicker debugging
-#SBATCH --error=logs/draw_umaps_%A_%a.err
+#SBATCH --error=logs/%A_%a_draw_umaps.err
 
 # Ensure directory exists
 mkdir -p logs
@@ -32,6 +32,13 @@ echo "------------------------------------------------------------"
 
 # Append a quick status line to the summary log
 echo "Task $SLURM_ARRAY_TASK_ID started on $SLURM_NODENAME at $START_TIME" >> $STATUS_LOG
+
+# Check if the directory argument was provided
+if [ -z "$1" ]; then
+    echo "ERROR: No directory provided."
+    echo "Usage: sbatch your_script.sh <directory_name>"
+    exit 1
+fi
 
 export PYTHONUNBUFFERED=1
 
