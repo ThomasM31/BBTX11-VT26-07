@@ -21,12 +21,14 @@ import seaborn as sns
 import matplotlib.pyplot as plt 
 
 # Own files
-from preprocessing import custom_train_test_split_modified
+from BINN import custom_train_test_split as ctts
 
 LABELS = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
+base_path = "/data/shared/alzgene26/data"
+data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
 
 def read_adata(indices: list, train_size=0.8):
-    train_adata, test_adata, collection = custom_train_test_split_modified.pipeline(indices, train_size)
+    train_adata, test_adata, collection = ctts.pipeline(indices, data_path, train_size)
     return train_adata, test_adata, collection
     
 def xy_datasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
@@ -37,11 +39,11 @@ def xy_datasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
 
     return X_train, y_train, X_test, y_test
 
-
 def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     X_train, y_train, X_test, y_test = xy_datasplit(train_adata, test_adata)
 
     # Support Vector Machine, icke-linjär
+    print("Creating model...")
     clf_svm = SVC(C=1, probability=True, gamma=0.001, kernel='rbf', class_weight='balanced') 
 
     # PCA
@@ -82,8 +84,9 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
 
 
 # indices: 0=astro, 1=exc1, 2=exc2, 3=exc3, 4=immune, 5=inhi, 6=oligo, 7=opcs, 8=vasc
+print("Reading adata...")
 train_adata, test_adata, acollection = read_adata([0,1,2,3,4,5,6,7,8], train_size=0.8)
-#baseline_model(train_adata, test_adata)
+baseline_model(train_adata, test_adata)
 
 # AUC and Mean CV AUC
 svm_dataset_performances = {"ALL": "AUC: 0.5612 Mean CV AUC: 0.6649",

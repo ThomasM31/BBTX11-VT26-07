@@ -35,7 +35,7 @@ class BINN(nn.Module):
         # Create the linear layers & batch normalizations dynamically, enable dropout
         self.model_layers = nn.ModuleList()
         self.batch_norms = nn.ModuleList()
-        self.dropout = nn.Dropout(0.3)
+        #self.dropout = nn.Dropout(0.3)
 
         current_in_features = in_features
         for layer_size in layers_list:
@@ -72,7 +72,7 @@ class BINN(nn.Module):
                 # Activation function
                 x = self.activation_fn(x)
                 # Dropout
-                x = self.dropout(x)
+                #x = self.dropout(x)
     
         return x
     

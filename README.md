@@ -5,7 +5,21 @@ Nu kör vi!
 
 
 ## Cite 
-- Om det blir en artikel är detta bra
+```
+@article{BBTX11-VT26-07,
+  title = {Partytime epic BINN lets go},
+  volume = {...},
+  ISSN = {.....},
+  url = {doi..... länk},
+  DOI = {doi, bara nummer},
+  number = {...},
+  journal = {....},
+  publisher = {...},
+  author = {Nordmark, Isabell and Mathiassen, Thomas and Edblad, Kasper and Antonsson, Lucas and Wåhlström,  Simon and Tong, Valentino},
+  year = {2026},
+  month = ... 
+}
+```
 
 ## Contributors
 All associated with **Chalmers University of Technology**
