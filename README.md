@@ -5,6 +5,7 @@ Nu kör vi!
 
 
 ## Cite 
+```
 @article{BBTX11-VT26-07,
   title = {Partytime epic BINN lets go},
   volume = {...},
@@ -18,6 +19,7 @@ Nu kör vi!
   year = {2026},
   month = ... 
 }
+```
 
 ## Contributors
 All associated with **Chalmers University of Technology**
