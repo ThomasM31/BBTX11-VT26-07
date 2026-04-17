@@ -1,19 +1,19 @@
 #!/bin/bash
-#SBATCH --job-name=prep_single
+#SBATCH --job-name=preprocessing_pseudo_non_hvg
 #SBATCH --partition=long
-#SBATCH --time=01:00:00
+#SBATCH --time=03:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --array=8
+#SBATCH --array=0-7
 
 # --- LOGGING SETUP ---
 # %A = Master Job ID | %a = Array Index ID
 # This creates one log file per task (e.g., logs/hvgs_12345_0.out)
-#SBATCH --output=logs/%A_%a_prep_single.out
+#SBATCH --output=logs/%A_%a_preproc_pseudo_non_hvg.out
 # This captures errors in a separate file for quicker debugging
-#SBATCH --error=logs/%A_%a_prep_single.err
+#SBATCH --error=logs/%A_%a_preproc_pseudo_non_hvg.err
 
 # Ensure directory exists
 mkdir -p logs
@@ -36,7 +36,7 @@ export PYTHONUNBUFFERED=1
 
 # Run the Python script
 # We use 'time' to see how long the Python process actually took
-time python3 -u pipeline_prep_assets_singular.py $SLURM_ARRAY_TASK_ID --draw_umaps False
+time python3 -u pipeline_preprocess_pseudo_non_hvg.py $SLURM_ARRAY_TASK_ID --draw_umaps False
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?

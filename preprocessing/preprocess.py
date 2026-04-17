@@ -92,6 +92,7 @@ def write_gene_expr_count(datasets: dict, filepath: Path) -> None:
 
         f = filepath / f'{label}.csv'
         adata.var['n_cells'].to_csv(f)
+    print(f'Gene expression counts saved to: {f}')
 
 def read_gene_expr_count(included_labels: list[str], filepath: Path) -> list:
     files = []
@@ -125,6 +126,8 @@ def sum_gene_expr_counts(
 
     pd.Series(genes_to_keep, name='gene_ids').to_csv(filepath_to, index=False)
 
+    print(f'{len(genes_to_keep)} genes expressed in over {min_cells} cells, saved to file.')
+
 
 def get_expressed_genes(
         datasets: dict, 
@@ -132,14 +135,8 @@ def get_expressed_genes(
         min_cells: int=200
         ) -> None:
     '''
-    Filter genes that appear in less than 'min_cells' cells cumulatively 
-    for all data sets.
-    Doing this over all datasets ensures that we don't accidentally 
-    remove genes that are lowly expressed in some cell type, 
-    but may be highly expressed in another.
+    Returns genes expressed in more than min_cells cells.
     '''
-    print(f'Filtering out genes expressed in <{min_cells} cells.')
-
     to_read = filepath / f'genes_to_keep_{min_cells}.csv'
     expressed_genes = pd.read_csv(to_read)
     return expressed_genes['gene_ids'].tolist()
@@ -177,7 +174,7 @@ def save_reactome_genes(
         for gene in reactome_genes:
             output.write(str(gene) + '\n')
 
-    print(f'Reactome genes written to {filepath / filename_save}')
+    print(f'{len(reactome_genes)} Reactome genes written to {filepath / filename_save}')
     
 def get_reactome_genes(
         datasets: dict,
@@ -185,27 +182,24 @@ def get_reactome_genes(
         filename: Path
         ) -> list[str]:
 
-    reactome_genes = []
     with open(filepath / filename, 'r') as input:
         reactome_genes = [g.strip('\n') for g in input.readlines()]
 
     return reactome_genes
 
 
-def filter_genes(datasets: dict, genes_to_keep: list[list[str]]):
-    common = set()
-    for gene_list in genes_to_keep:
-        for gene in gene_list:
-            common.add(gene)
-    
+def filter_genes(datasets: dict, genes_to_keep: list[list[str]]) -> None:
+
     for label, adata in datasets.items():
         old_genes = adata.n_vars
-        rel_genes = [g for g in common if g in adata.var_names]
-        datasets[label] = adata[:, adata.var_names.isin(rel_genes)]
+        rel_genes = set(adata.var_names)
+        for gene_list in genes_to_keep:
+            rel_genes &= set(gene_list)
+        
+        datasets[label] = adata[:, list(rel_genes)]
         new_genes = datasets[label].n_vars
+        print('Gene filtering completed.')
         print(f"{label}: {old_genes} -> {new_genes} genes (removed {old_genes - new_genes})")
-
-    print('Genes filtered.')
 
 
 def prep_for_hvg_sel(datasets: dict) -> None:
@@ -372,6 +366,22 @@ def pseudobulk(datasets: dict) -> None:
         datasets[label].uns['pseudo'] = pseudo
         print(datasets[label].uns['pseudo'])
 
+def pseudobulk_non_hvg(datasets: dict) -> None:
+    # Perform pseudobulk by test subject and high res celltype
+
+    for label, adata in datasets.items():
+        print(f'Pseudobulking "{label}"')
+
+        pseudo = sc.get.aggregate(
+            adata, 
+            by=['subject', 'cell_type_high_resolution'], 
+            func='sum'
+            )
+
+        # moves pseudobulk to the main layer
+        pseudo.X = pseudo.layers['sum'].copy()
+        datasets[label].uns['pseudo'] = pseudo
+        print(datasets[label].uns['pseudo'])
 
 def normalize(datasets: dict) -> None:
     for label in list(datasets.keys()):
@@ -473,6 +483,35 @@ def add_metadata(datasets: dict, filepath: Path, is_float=True) -> None:
         pseudo.obs['AD_status'] = [str(status_map.get(s)) for s in subjects]
         pseudo.obs['AD_status'] = pseudo.obs['AD_status'].astype('category')
 
+def add_metadata_non_pseudo(datasets: dict, filepath: Path, is_float=True) -> None:
+    # Add subject disease status metadata
+    file = 'individual_metadata_deidentified.tsv'
+    p = filepath / file
+    metadata = pd.read_csv(p,sep='\t')
+
+    AD_status_lbl = 'Pathologic_diagnosis_of_AD'
+    md_sel = metadata[['subject', AD_status_lbl]]
+
+    # Annotate the data with the disease status of the subject
+
+    # floats for logits loss
+    # int for BCE loss
+    v_yes, v_no = (1.0, 0.0) if is_float else (1, 0)
+    
+    md_sel = md_sel.copy()
+    md_sel[AD_status_lbl] = md_sel[AD_status_lbl].replace({'yes': v_yes, 'no': v_no})
+
+    # create map with subject as key, AD status as value
+    status_map = dict(zip(md_sel['subject'], md_sel[AD_status_lbl]))
+
+    for label, adata in datasets.items():
+        #pseudo = datasets[label].uns['pseudo']
+        subjects = adata.obs['subject'].astype(str).values
+
+        adata.obs['AD_status'] = [str(status_map.get(s)) for s in subjects]
+        adata.obs['AD_status'] = adata.obs['AD_status'].astype('category')
+
+
 def move_pseudo_main(datasets: dict):
     for label, adata in datasets.items():
         pseudo = adata.uns['pseudo']
@@ -482,6 +521,10 @@ def move_pseudo_main(datasets: dict):
         print(f'Dataset {label} after moving pseudo to main:')
         print(datasets[label])
 
+def move_hvgs_main(datasets):
+    for label, adata in datasets.items():
+        hvgs = datasets[label].uns['common_hvgs']
+        datasets[label] = ad.AnnData(hvgs)
 
 def save_files(datasets: dict, filepath: Path, stage:str) -> None:
     print(f'Writing files at stage "{stage}"')
@@ -492,4 +535,5 @@ def save_files(datasets: dict, filepath: Path, stage:str) -> None:
 
         datasets[label].write_h5ad(to)
 
-    print(f'Writing to file(s) at stage {stage} done!')
+    print(f'Writing to file(s) at stage {stage} done! Path:')
+    print(to)
