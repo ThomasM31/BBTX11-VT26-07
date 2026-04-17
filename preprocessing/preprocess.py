@@ -48,7 +48,7 @@ def read_files(datasets: dict, filepath: Path) -> None:
 
 def read_intermediate(datasets: dict, filepath: Path) -> None:
     '''
-    To read a file saved at any stage of processing ('label.h5ad').
+    To read files saved at any stage of processing ('label.h5ad').
     '''
     for label, dataset in datasets.items():
         print(f'Reading: {label}')
@@ -85,39 +85,30 @@ def filter_cells_by_mitochondrial_content(datasets: dict, mt_threshold: float=5.
 
 
 def write_gene_expr_count(datasets: dict, filepath: Path) -> None:
-
     for label, adata in datasets.items():
-        # counts how many cells expresses each gene
+        # counts how many cells express each gene
         sc.pp.filter_genes(adata, min_cells=0)
         counts = adata.var['n_cells'].tolist()
 
         f = filepath / f'{label}.csv'
         adata.var['n_cells'].to_csv(f)
 
-def read_gene_expr_count(datasets: dict, filepath: Path) -> list:
-    
-    files = [f.name for f in filepath.iterdir() if f.is_file()]
-    
-    # correct cell type for this run
-    rel_files = []
-    for label in datasets.keys():
-        for file in files:
-            is_correct_label = file.startswith(label)
-            
-            if is_correct_label:
-                rel_files.append(file)
-    
-    counts_list = []
+def read_gene_expr_count(included_labels: list[str], filepath: Path) -> list:
+    files = []
+    for label in included_labels:
+        f = f'{label}.csv'
+        if (filepath / f).exists():
+            files.append(f)
 
-    for i, file in enumerate(rel_files):
+    counts_list = []
+    for file in files:
         to_read = filepath / file
         counts = pd.read_csv(to_read, index_col=0).iloc[:, 0]
         counts_list.append(counts)
-        
     return counts_list
 
 def sum_gene_expr_counts(
-        datasets: dict, 
+        included_labels: list[str], 
         filepath_from: Path, 
         filepath_to: Path, 
         min_cells: int
@@ -126,18 +117,16 @@ def sum_gene_expr_counts(
     Sum the number of cell where each gene is expressed for all data sets.
     Writes a file of all genes expressed in at least 'min_cells' cells.
     '''
-    counts_list = read_gene_expr_count(datasets, filepath_from)
+    counts_list = read_gene_expr_count(included_labels, filepath_from)
 
     # sum counts and list all that are expressed in more than at least min_cells
     total_counts = pd.concat(counts_list, axis = 1).sum(axis = 1)
     genes_to_keep = total_counts[total_counts >= min_cells].index
- 
-    to = filepath_to / f'genes_to_keep_{min_cells}.csv'
-        
-    pd.Series(genes_to_keep, name='gene_ids').to_csv(to, index=False)
+
+    pd.Series(genes_to_keep, name='gene_ids').to_csv(filepath_to, index=False)
 
 
-def filter_genes(
+def get_expressed_genes(
         datasets: dict, 
         filepath: Path, 
         min_cells: int=200
@@ -152,62 +141,72 @@ def filter_genes(
     print(f'Filtering out genes expressed in <{min_cells} cells.')
 
     to_read = filepath / f'genes_to_keep_{min_cells}.csv'
-    genes_to_keep = pd.read_csv(to_read)
-    genes_to_keep = genes_to_keep['gene_ids'].tolist()
+    expressed_genes = pd.read_csv(to_read)
+    return expressed_genes['gene_ids'].tolist()
 
-    # do the filtering
-    for label, adata in datasets.items():
-        print(f'{label}: removing genes expressed in <{min_cells} cells (cumulative)')
-        old_genes = adata.n_vars
-        datasets[label] = adata[:, adata.var_names.isin(genes_to_keep)].copy()
-        new_genes = datasets[label].n_vars
-        print(f"{label}: {old_genes} -> {new_genes} genes (removed {old_genes - new_genes})")
 
-def filter_non_reactome_genes(
-        datasets: dict,
+def save_reactome_genes(
         filepath: Path,
-        filename: Path
-        ) -> None:
+        filename_read: str,
+        filename_save: str
+        ) -> list[str]:
     '''
     Exclude genes that are not present in the Reactome database.
     This so that we will not have genes in our final training data 
     that are not connected to a pathway or process in the neural network.
     '''
+    # Read GMT-files to extract all genes in reactome database
+    # GMT files contain entries with:
+    # pathway name | pathway ID | list of associated genes
 
     print(f'Filtering out genes not present in Reactome.')
-
-    def extract_reactome_genes(filepath: Path, filename: str) -> list[str]:
-        # Read GMT-files to extract all genes in reactome database
-        # GMT files contain entries with:
-        # pathway name | pathway ID | list of associated genes
-
-        f = filepath / filename
-
-        all_genes = set()
-        with open(f, 'r') as lines:
-            for line in lines:
-                parts = line.strip().split('\t')
-                pathway_id = parts[1]
-
-                # only keep entries related to human biology
-                if pathway_id.startswith('R-HSA'):
-                    genes = parts[2:]
-                    for gene in genes:
-                        all_genes.add(gene)
-
-        return list(all_genes)
     
-    reactome_genes = extract_reactome_genes(filepath, filename)
+    reactome_genes = set()
+    with open(filepath / filename_read, 'r') as lines:
+        for line in lines:
+            parts = line.strip().split('\t')
+            pathway_id = parts[1]
+
+            # only keep entries related to human biology
+            if pathway_id.startswith('R-HSA'):
+                pathway_genes = parts[2:]
+                for gene in pathway_genes:
+                    reactome_genes.add(gene)
     
-    # filter out any genes not present in reactome
+    with open(filepath / filename_save, 'w') as output:
+        for gene in reactome_genes:
+            output.write(str(gene) + '\n')
+
+    print(f'Reactome genes written to {filepath / filename_save}')
+    
+def get_reactome_genes(
+        datasets: dict,
+        filepath: Path,
+        filename: Path
+        ) -> list[str]:
+
+    reactome_genes = []
+    with open(filepath / filename, 'r') as input:
+        reactome_genes = [g.strip('\n') for g in input.readlines()]
+
+    return reactome_genes
+
+
+def filter_genes(datasets: dict, genes_to_keep: list[list[str]]):
+    common = set()
+    for gene_list in genes_to_keep:
+        for gene in gene_list:
+            common.add(gene)
+    
     for label, adata in datasets.items():
         old_genes = adata.n_vars
-        rel_genes = [g for g in reactome_genes if g in adata.var_names]
-        datasets[label] = adata[:, adata.var_names.isin(reactome_genes)]
+        rel_genes = [g for g in common if g in adata.var_names]
+        datasets[label] = adata[:, adata.var_names.isin(rel_genes)]
         new_genes = datasets[label].n_vars
         print(f"{label}: {old_genes} -> {new_genes} genes (removed {old_genes - new_genes})")
 
-    print(f'Reactome gene filtering completed.')
+    print('Genes filtered.')
+
 
 def prep_for_hvg_sel(datasets: dict) -> None:
     for label in list(datasets.keys()):
@@ -285,32 +284,28 @@ def find_common_hvgs(
         datasets: dict, 
         filepath_from: Path, 
         filepath_to: Path,  
-        n_top_genes: int, 
-        min_common: int = 1000, 
+        n_top_genes: int,
+        genes_to_keep: set[str],
+        nr_common_hvgs: int = 1000, 
         inc_val: int = 3000
         ) -> None:
 
-    files = [f.name for f in filepath_from.iterdir() if f.is_file()]
-
-    # retain only files with correct cell type for this run
     rel_files = []
-    for label in datasets.keys():
-        for file in files:
-            if file.startswith(label):
-                rel_files.append(file)
+    for label in datasets:
+        f = f'{label}.txt'
+        if (filepath_from / f).exists():
+            rel_files.append(f)
     
     hvgs = []  
     for i, file in enumerate(rel_files):
         path = filepath_from / file
         with open(path, 'r') as input:
             genes = input.readlines()
-            hvgs.append([g.strip('\n') for g in genes])
+            genes = set([g.strip('\n') for g in genes])
+            # only keep genes that are also in our list of "acceptable" genes
+            hvgs.append([g for g in genes if g in genes_to_keep])
 
-    # remove any genes that have already been filtered out
-    for i, label in enumerate(datasets.keys()):
-        hvgs[i] = [g for g in hvgs[i] if g in datasets[label].var_names]
-
-    def get_common(hvgs: list, n_top_genes: int) -> list:
+    def _get_common(hvgs: list, n_top_genes: int) -> list:
         common_dict = {g: None for g in hvgs[0][:n_top_genes]}
 
         for hvg_list in hvgs[1:]:
@@ -324,34 +319,31 @@ def find_common_hvgs(
     n = n_top_genes
     # run the get_common with larger numbers of variables, 
     # until we get a a value that is at least min_common
-    while len(common_hvgs) < min_common:
-        common_hvgs = get_common(hvgs, n)
+    while len(common_hvgs) < nr_common_hvgs:
+        common_hvgs = _get_common(hvgs, n)
         n += inc_val
 
     # just take the min_common most variable
-    common_hvgs = common_hvgs[:min_common]
+    common_hvgs = common_hvgs[:nr_common_hvgs]
+    if len(common_hvgs) < nr_common_hvgs:
+        print(f'WARNING: only found {len(common_hvgs)} hvgs')
 
     print(f'Found {len(common_hvgs)} common HVGs with n_top_genes={n}')
-    
-    # prepare filename to save common hvgs
-    # if all cell types are included, for brevity use 'all'
-    if len(list(datasets.keys())) == 9:
-        included = 'all'
-    else:
-        included = "_".join(datasets.keys())
 
+    filename = f'{"_".join(datasets.keys())}_common_{nr_common_hvgs}.txt' 
     # create text file of all common HVGs
-    fname = f'{included}_common_{len(common_hvgs)}.txt'
-    to = filepath_to / fname
-    with open(to, 'w') as output:
+    with open(filepath_to / filename, 'w') as output:
         for gene in common_hvgs:
             output.write(str(gene) + '\n')
 
     
-def filter_common_hvgs(datasets: dict, filepath: Path, hvg_file:str) -> None:
+def filter_common_hvgs(
+        datasets: dict, 
+        filepath: Path, 
+        filename: str
+        ) -> None:
     
-    path = filepath / hvg_file
-    with open(path, 'r') as input:
+    with open(filepath / filename, 'r') as input:
         genes = input.readlines()
         common_hvgs = [g.strip('\n') for g in genes]
 
@@ -361,6 +353,7 @@ def filter_common_hvgs(datasets: dict, filepath: Path, hvg_file:str) -> None:
         datasets[label].uns['common_hvgs'] = adata[:, common_hvgs].copy()
         print(f'Writing common hvgs to datset for {label}.')
         print(datasets[label].uns['common_hvgs'])
+
 
 def pseudobulk(datasets: dict) -> None:
     # Perform pseudobulk by test subject and high res celltype

@@ -6,14 +6,13 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --array=0-8
 
 # --- LOGGING SETUP ---
 # %A = Master Job ID | %a = Array Index ID
 # This creates one log file per task (e.g., logs/hvgs_12345_0.out)
-#SBATCH --output=logs/hvgs_%A_%a.out
+#SBATCH --output=logs/preproc_%A_%a.out
 # This captures errors in a separate file for quicker debugging
-#SBATCH --error=logs/hvgs_%A_%a.err
+#SBATCH --error=logs/preproc_%A_%a.err
 
 # Ensure directory exists
 mkdir -p logs
@@ -36,7 +35,7 @@ export PYTHONUNBUFFERED=1
 
 # Run the Python script
 # We use 'time' to see how long the Python process actually took
-time python3 -u pipeline.py $SLURM_ARRAY_TASK_ID --draw_umaps True
+time python3 -u pipeline_prep_collection.py 0 1 2 3 4 5 6 7 8 --draw_umaps False
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?

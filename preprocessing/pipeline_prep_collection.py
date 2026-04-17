@@ -3,12 +3,17 @@ import argparse
 import os
 from pathlib import Path
 
+'''
+SECOND PIPELINE TO PREPARE DATA FOR PREPROCESSING.
+DOES TASKS THAT MUST BE DONE FOR SEVERAL DATASETS AT ONCE.
+'''
+
 def pipeline(
         to_include: list, 
         n_top_genes: int, 
         min_genes: int, 
         min_cells:int,
-        min_common_hvgs:int,
+        nr_common_hvgs:int,
         common_hvg_inc_value:int,  
         draw_umaps: bool,
         shared_dir_mode: bool
@@ -23,7 +28,7 @@ def pipeline(
         base_path = Path("/data/users") / user / "kand/data/"
     
     processed_data = "processed_data"
-    run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{min_common_hvgs}' 
+    run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{nr_common_hvgs}' 
 
     paths = {}
     paths["conv_data_path"]          = base_path / "conv_data"
@@ -50,106 +55,40 @@ def pipeline(
     datasets = pre.get_datasets(included_labels)
 
     # read h5ad files, add to datasets dict
-    pre.read_files(datasets, paths["conv_data_path"])
+    #pre.read_files(datasets, paths["conv_data_path"])
 
-    #-------FILTERING PREP FOR PER GENE FILTERING-------
-    
-    for label, adata in datasets.items():
-        f = paths["gene_expr_count_path"] / f'{label}.csv'
-        if not f.exists():
-            # writes gene expression count per dataset to .csv
-            d = {label:adata}
-            pre.write_gene_expr_count(d, paths["gene_expr_count_path"])
-
+    # sum gene expression counts for all datasets, 
+    # list all genes that are expressed in more than min_cells in .csv
     f = paths["genes_keep_path"] / f'genes_to_keep_{min_cells}.csv'
-    if not f.exists():
-        # sum gene expression counts for all datasets, 
-        # list all genes that are expressed in more than min_cells in .csv
-        pre.sum_gene_expr_counts(
-            datasets, 
-            paths["gene_expr_count_path"], 
-            paths["genes_keep_path"], 
-            min_cells)
+    pre.sum_gene_expr_counts(
+        included_labels, 
+        paths["gene_expr_count_path"], 
+        f, 
+        min_cells)    
 
-    #-------PERFORM FILTERING-------
-    # filter bad cells
+    # We need to have access to the genes that we actually want to keep
+    # (highly expressed and in Reactome) so that we can limit our HVGs
+    # so we don't get genes in our list of common HVGs that we don't want to use.
+    genes_to_keep = []
+    # get genes with expression over threshold from file
+    genes_to_keep.extend(pre.get_expressed_genes(
+        datasets, paths["genes_keep_path"], min_cells))
+
+    # get genes that exist in reactome from file
+    save_file = 'reactome_genes.txt'
+    genes_to_keep.extend(pre.get_reactome_genes(datasets, paths["pathway_data_path"], save_file))
+    genes_to_keep = set(genes_to_keep)
     
-    # The cell filtering doesn't actually remove anything from our dataset using
-    # the default values, therefore commented out
-
-    # remove cells with less than 200 expressed genes
-    #pre.filter_cells_by_min_genes(datasets, min_genes=200)
-    
-    # remove cells with mito gene expression over threshold
-    #pre.filter_cells_by_mitochondrial_content(datasets)
-
-    # filter lowly expressed genes
-    pre.filter_genes(datasets, paths["genes_keep_path"], min_cells)
-
-    # filter genes that don't exist in Reactome
-    pre.filter_non_reactome_genes(datasets, paths["pathway_data_path"], 'ReactomePathways.gmt')
-
-    #-------FIND AND FILTER HVGs-------
-    
-    # make one .txt file for each cell type with 
-    # genes sorted from most to least variable
-    # this method does not require normalized data
-    for label, adata in datasets.items():
-        f = paths["hvg_lists_path"] / f'{label}.txt'
-        if not f.exists():
-            d = {label:adata}
-            pre.extract_hvgs_full_list(d, paths["hvg_lists_path"])
-
-    # prepare filename to save common hvgs
-    # if all cell types are included, for brevity use 'all'
-    if len(list(datasets.keys())) == 9:
-        included = 'all'
-    else:
-        included = "_".join(datasets.keys())
-    hvg_file = f'{included}_common_{min_common_hvgs}.txt'
-    f = paths["hvg_common_path"] / hvg_file
-    
-    # Find n_top common hvgs from txt files
-    if not f.exists():
-        pre.find_common_hvgs(
-            datasets, 
-            paths["hvg_lists_path"], 
-            paths["hvg_common_path"], 
-            n_top_genes, 
-            min_common_hvgs, 
-            common_hvg_inc_value
-            )
-
-    # filter by common hvgs
-    pre.filter_common_hvgs(datasets, paths["hvg_common_path"], hvg_file)
-
-    #-------PSEUDOBULK AND NORMALIZE-------
-
-    # sum counts per subject and high res cell type
-    pre.pseudobulk(datasets)
-    
-    #  normalize per pseudobulk sample
-    pre.normalize(datasets)
-
-    #-------ADD METADATA-------
-
-    # add disease status
-    pre.add_metadata(datasets, paths["metadata_path"])
-
-    #-------UMAPS-------
-
-    # visualize how the preprocessing has improved (?) 
-    # separation of cells (slow and uses a lot of memory!!)
-    # for this one it is better to load each data set separately
-    if draw_umaps: pre.draw_umaps(datasets=datasets, filepath=path["figures_path"])
-
-    #-------MOVE PROCESSED DATA TO MAIN LAYER AND SAVE-------
-    
-    # move pseudobulk data to main layer, discard everything else
-    # this will make the files a lot smaller
-    pre.move_pseudo_main(datasets)
-
-    pre.save_files(datasets, paths["completed_path"], 'completed')
+    # Find n_top common hvgs from txt files, save to file
+    pre.find_common_hvgs(
+        datasets, 
+        paths["hvg_lists_path"], 
+        paths["hvg_common_path"],
+        n_top_genes, 
+        genes_to_keep,
+        nr_common_hvgs, 
+        common_hvg_inc_value
+        )
 
     print('Pipeline completed')
 
@@ -192,7 +131,7 @@ if __name__ == "__main__":
 
     # Optional argument
     parser.add_argument(
-        "--min_common_hvgs", 
+        "--nr_common_hvgs", 
         type=int,
         default=1000,
         help="Target for minimum nr of common hvgs"
@@ -229,7 +168,7 @@ if __name__ == "__main__":
     min_cells = args.gene_in_min_cells
     min_genes = args.cell_with_min_genes
     draw_umaps = args.draw_umaps
-    min_common_hvgs = args.min_common_hvgs
+    nr_common_hvgs = args.nr_common_hvgs
     common_hvg_inc_value = args.common_hvg_inc_value
     shared_dir_mode = args.shared_dir_mode
 
@@ -238,7 +177,7 @@ if __name__ == "__main__":
         n_top_genes=n_top, 
         min_genes=min_genes, 
         min_cells=min_cells, 
-        min_common_hvgs=min_common_hvgs, 
+        nr_common_hvgs=nr_common_hvgs, 
         common_hvg_inc_value=common_hvg_inc_value, 
         draw_umaps=draw_umaps,
         shared_dir_mode = shared_dir_mode
