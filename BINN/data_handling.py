@@ -112,8 +112,8 @@ def subset_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
         # Update dictionary
         datasets_aligned.update({label: adata_aligned})
 
-        #print(f"Overlapping genes kept: {adata_aligned.n_vars} for {label}")
-        #print(f"Genes dropped: {adata.n_vars - adata_aligned.n_vars}\n")
+        print(f"Overlapping genes kept: {adata_aligned.n_vars} for {label}")
+        print(f"Genes dropped: {adata.n_vars - adata_aligned.n_vars}\n")
 
     return datasets_aligned
 
@@ -192,16 +192,15 @@ def training_loop(model: BINN,
 # TESTING
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
-comp_proc_data_path = "/data/users/thomath/kand/data/processed_data/extracted_from_completed/"
+
+# GLOBALS
+EPOCHS = 30
+TRAIN_SIZE = 0.8
+ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
+MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+            for i in range(5)]
 
 def pipeline() -> None:
-    # GLOBALS
-    EPOCHS = 15
-    TRAIN_SIZE = 0.8
-    ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-    MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
-                for i in range(5)]
-
     print("Fetching device...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -215,7 +214,7 @@ def pipeline() -> None:
     model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
 
     print("Reading data into datasets...")
-    datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=comp_proc_data_path)
+    datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
 
     print("Aligning adatas to BINN...")
     datasets_aligend = subset_genes(datasets, masks['df0'])
