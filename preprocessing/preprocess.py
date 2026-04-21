@@ -145,11 +145,12 @@ def save_reactome_genes(
         filepath: Path,
         filename_read: str,
         filename_save: str
-        ) -> list[str]:
+        ) -> None:
     '''
-    Exclude genes that are not present in the Reactome database.
-    This so that we will not have genes in our final training data 
-    that are not connected to a pathway or process in the neural network.
+    Save a list of genes that are present in the Reactome database.
+    For later filtering of genes, so that we will not have genes in our 
+    final training data that are not connected to a pathway or process 
+    in the neural network.
     '''
     # Read GMT-files to extract all genes in reactome database
     # GMT files contain entries with:
