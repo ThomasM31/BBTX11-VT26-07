@@ -17,29 +17,27 @@ def pipeline(
         ) -> None:
     
     pp = ppaths.PipelinePaths(shared_dir_mode, proc_dir.parts[-1])
+    save_path = pp.figures_path / proc_dir
+    save_path.mkdir(parents=True, exist_ok=True)
 
     # from int to readable labels
     included_labels = pre.get_labels(to_include)
+    label = included_labels[0]
 
     # create empty dict
-    datasets_orig = pre.get_datasets(included_labels)
-    datasets_pseudo = pre.get_datasets(included_labels)
+    datasets_processed = pre.get_datasets(included_labels)
 
     # read h5ad files, add to datasets dict
-    pre.read_files(datasets_orig, pp.conv_data_path)
+    pre.read_intermediate(datasets_processed, pp.compl_base / proc_dir)
+    proc_dataset = datasets_processed[label]
 
-    pre.read_intermediate(datasets_pseudo, pp.compl_base / proc_dir)
+    print(proc_dataset)
 
-    if len(datasets_orig.keys()) != len(datasets_pseudo.keys()):
-        print("Not same number of datasets to compare. Exiting.")
-        return
-    
-    #-------DRAW UMAPS-------
+    color_by = 'cell_type_high_resolution'
+    umaps.draw_umap(proc_dataset, label, save_path, 'processed', color_by)
 
-    # visualize how the preprocessing has improved (?) 
-    # separation of cells (slow and uses a lot of memory!!)
-    # for this one it is better to load each data set separately
-    umaps.draw_umaps(datasets_orig, datasets_pseudo, pp.figures_path)
+    color_by = 'AD_status'
+    umaps.draw_umap(proc_dataset, label, save_path, 'processed', 'AD_status')
 
     print('Pipeline completed')
 
