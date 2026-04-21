@@ -38,7 +38,7 @@ OUTPUT_DIR="/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline"
 CONNECTIVITY_FILE="/data/shared/alzgene26/PathwayData/binn_connectivity.csv"
 
 # Run the Python script
-time python3 -u MaskCreator.py "$INPUT_DIR" "$OUTPUT_DIR" "$CONNECTIVITY_FILE" --mask_label=vasc --n_layers=10
+time python3 -u MaskCreator.py "$INPUT_DIR" "$OUTPUT_DIR" "$CONNECTIVITY_FILE" --mask_label=vasc --n_layers=4
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?
