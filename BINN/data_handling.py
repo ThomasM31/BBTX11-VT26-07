@@ -85,7 +85,7 @@ def compute_features(masks:dict, device) -> tuple[int, list, list]:
     # Starting amount of features
     in_features = masks["df0"].shape[0]
     # Extract layer dimensions
-    layers_list = [masks[mask].shape[1] for mask in masks]
+    layers_list = [masks[mask].shape for mask in masks]
 
     # Conversion for mask matrix list, creates tensors for BINN, transposed
     tensor_masks = [torch.tensor(mask).float().t() for mask in mask_matrix_list]
