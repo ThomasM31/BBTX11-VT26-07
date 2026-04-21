@@ -32,7 +32,7 @@ class BINN(nn.Module):
         for i, m in enumerate(mask_list):
             self.register_buffer(f'mask_{i}', m)
 
-        # Create the linear layers & batch normalizations dynamically, enable dropout
+        # Create the linear layers
         self.model_layers = nn.ModuleList()
         # self.batch_norms = nn.ModuleList()
 
