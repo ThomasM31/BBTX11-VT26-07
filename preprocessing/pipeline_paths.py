@@ -9,7 +9,12 @@ class PipelinePaths:
             if isinstance(attr, Path):
                 attr.mkdir(parents=True, exist_ok=True)
 
-    def __init__(self, shared_dir_mode: bool, run_vars: str) -> None:
+    def __init__(self, 
+                 shared_dir_mode: bool, 
+                 full_pipeline_run_vars: str = '',
+                 pseudo_non_hvg_run_vars: str = '',
+                 hvg_non_pseudo_run_vars: str = ''
+                 ) -> None:
 
         if shared_dir_mode:
             # To read from and write to the shared folder
@@ -35,6 +40,10 @@ class PipelinePaths:
         
         # to save umaps
         self.figures_path         = data_path / "figures"
+        self.full_pipeline_figs   = self.figures_path / "full_pipeline" / full_pipeline_run_vars
+        self.danish_figs          = self.figures_path / "danish" 
+        self.pseudo_non_hvg_figs   = self.figures_path / "pseudo_non_hvg" / pseudo_non_hvg_run_vars
+        self.hvg_non_pseudo_figs  = self.figures_path / "hvg_non_pseudo" / hvg_non_pseudo_run_vars
         
         # to save smaller files that are faster to read
         self.test_data_path       = data_path / processed_data / "test_data"
@@ -45,10 +54,10 @@ class PipelinePaths:
         # for saving fully preprocessed data
         self.compl_base = data_path / processed_data / "completed"
         
-        self.compl_full_pipe_path = self.compl_base / "full_pipeline" / run_vars
+        self.compl_full_pipe_path = self.compl_base / "full_pipeline" / full_pipeline_run_vars
         self.compl_path_danish    = self.compl_base / "danish"
-        self.compl_hvg_non_pseudo = self.compl_base / "hvg_non_pseudo" / run_vars
-        self.compl_pseudo_non_hvg = self.compl_base / "pseudo_non_hvg" / run_vars
+        self.compl_hvg_non_pseudo = self.compl_base / "hvg_non_pseudo" / hvg_non_pseudo_run_vars
+        self.compl_pseudo_non_hvg = self.compl_base / "pseudo_non_hvg" / pseudo_non_hvg_run_vars
 
         self.extra_test_path = data_path / processed_data/ "test_path"
 

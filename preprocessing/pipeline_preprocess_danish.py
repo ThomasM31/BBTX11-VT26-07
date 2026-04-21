@@ -19,8 +19,7 @@ def pipeline(
         shared_dir_mode: bool
         ) -> None:
     
-    run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{nr_common_hvgs}' 
-    pp = ppaths.PipelinePaths(shared_dir_mode, run_vars)
+    pp = ppaths.PipelinePaths(shared_dir_mode)
 
     #-------START PROCESSING-------
     
