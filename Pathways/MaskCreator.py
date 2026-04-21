@@ -283,12 +283,28 @@ class PathwayNetwork:
         normalized_subgraph = _get_normalized_subgraph(self.pathway_graph, n_layers)
         network_layers = _get_network_layers(normalized_subgraph, n_layers)
         
-        terminal_nodes = [n for n, d in normalized_subgraph.out_degree() if d == 0]
+        original_pathways = set(self.pathway_graph.nodes())
+        normalized_pathways = set(normalized_subgraph.nodes())
+        pruned_pathways = original_pathways - normalized_pathways
+        print(f"Pathways pruned (unreachable or too deep): {len(pruned_pathways)}")
 
+        # TODO: this is the logic that we need to change if 
+        # we want to map genes to intermediate pathways
+        terminal_nodes = [n for n, d in normalized_subgraph.out_degree() if d == 0]
+        
         # group genes for speed of compute
         df_conn = pd.DataFrame(self.gene_pathway_conn, columns=["input", "connections"])
         grouped_genes = df_conn.groupby("connections")["input"].unique()
+
+        # Check if any genes are mapped to intermediate pathways
+        all_annotated_pathways = set(df_conn["connections"])
+        terminal_pathways = {re.sub(r"_copy.*", "", n) for n in terminal_nodes}
+
+        non_terminal_annotated = all_annotated_pathways - terminal_pathways
+        print(f"Genes mapped to intermediate pathways: {len(non_terminal_annotated)}")
         
+        # TODO: this is the logic that we need to change if 
+        # we want to map genes to intermediate pathways
         term_map = {}
         for n in terminal_nodes:
             # remove copy suffix from pathway
@@ -326,7 +342,14 @@ class PathwayNetwork:
 
 
 
-def main(INPUT_DIR: Path, OUTPUT_DIR: Path, CONNECTIVITY_FILE: Path, several_datasets: bool, mask_label: str):
+def main(
+        INPUT_DIR: Path, 
+        OUTPUT_DIR: Path, 
+        CONNECTIVITY_FILE: Path, 
+        several_datasets: bool, 
+        mask_label: str, 
+        n_layers: int
+        ):
     print("=== STARTING FULL MASK GENERATION ===")
 
     # Read the network connectivities
@@ -365,9 +388,12 @@ def main(INPUT_DIR: Path, OUTPUT_DIR: Path, CONNECTIVITY_FILE: Path, several_dat
                                 pathway_pathway_mapping,
                                 gene_pathway_mapping
                                 )
+
+            missing_genes = gene_set - set(pn.input_genes)
+            print(f"Nr genes without pathway annotations: {len(missing_genes)}")
             
-            # Generate matrixes NOTE: (4 layers, change later?)
-            matrices = pn.get_connectivity_matrices(n_layers=4)
+            # Generate matrixes
+            matrices = pn.get_connectivity_matrices(n_layers=n_layers)
             
             for i, m in enumerate(matrices):
                 save_name = save_str if save_str != '' else cell_name 
@@ -438,6 +464,13 @@ if __name__ == "__main__":
         help="label for cell type to mask from"
     )
 
+    parser.add_argument(
+        "--n_layers",
+        type=int,
+        default=4,
+        help="nr of layers (excluding output layer)"
+    )
+
     args = parser.parse_args()
 
     filepath_in = args.filepath_in
@@ -445,5 +478,6 @@ if __name__ == "__main__":
     connectivity_file = args.connectivity_file
     several_datasets = args.several_datasets
     mask_label = args.mask_label
+    n_layers = args.n_layers
 
-    main(filepath_in, filepath_out, connectivity_file, several_datasets, mask_label)
+    main(filepath_in, filepath_out, connectivity_file, several_datasets, mask_label, n_layers)
