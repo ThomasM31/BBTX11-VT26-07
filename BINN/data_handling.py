@@ -85,12 +85,15 @@ def compute_features(masks:dict, device) -> tuple[int, list, list]:
     # Starting amount of features
     in_features = masks["df0"].shape[0]
     # Extract layer dimensions
-    layers_list = [masks[mask].shape[1] for mask in masks]
+    layers_list = [masks[mask].shape for mask in masks]
 
     # Conversion for mask matrix list, creates tensors for BINN, transposed
     tensor_masks = [torch.tensor(mask).float().t() for mask in mask_matrix_list]
     # Put on device
     tensor_masks = [mask.to(device) for mask in tensor_masks]
+
+    print(f"input features: {in_features}")
+    print(f"layer list: {layers_list}")
 
     return in_features, layers_list, tensor_masks
 
@@ -106,7 +109,7 @@ def subset_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
         adata = datasets[label]
         # Find the intersection of genes
         overlapping_genes = [g for g in target_genes if g in adata.var_names]
-
+        
         # Subset the dataset
         adata_aligned = adata[:, overlapping_genes].copy()
         # Update dictionary
@@ -191,13 +194,13 @@ def training_loop(model: BINN,
 
 # TESTING
 base_path = "/data/shared/alzgene26/data"
-data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
+data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
 
 # GLOBALS
 EPOCHS = 30
 TRAIN_SIZE = 0.8
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
             for i in range(5)]
 
 def pipeline() -> None:
@@ -234,12 +237,6 @@ def pipeline() -> None:
     print("Running train/test loop")
     training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, EPOCHS)
 
-    # ONLY RUN ONCE ON LARGE FILES
-    #print("Processing datasets...")
-    #datasets_proc = process_completed_data(datasets)
-    #print("Saving data...")
-    #save_data(datasets_proc, comp_proc_data_path)
-    
     print("Pipeline completed!")
 
 if __name__ == "__main__":

@@ -32,10 +32,9 @@ class BINN(nn.Module):
         for i, m in enumerate(mask_list):
             self.register_buffer(f'mask_{i}', m)
 
-        # Create the linear layers & batch normalizations dynamically, enable dropout
+        # Create the linear layers
         self.model_layers = nn.ModuleList()
-        self.batch_norms = nn.ModuleList()
-        #self.dropout = nn.Dropout(0.3)
+        # self.batch_norms = nn.ModuleList()
 
         current_in_features = in_features
         for layer_size in layers_list:
@@ -43,12 +42,12 @@ class BINN(nn.Module):
             self.model_layers.append(nn.Linear(current_in_features, layer_size))
 
             # Create BatchNorm, except for final layer
-            if layer_size > 1:
-                self.batch_norms.append(nn.BatchNorm1d(layer_size, eps=1e-3, momentum=0.01))
+            #if layer_size > 1:
+            #    self.batch_norms.append(nn.BatchNorm1d(layer_size, eps=1e-3, momentum=0.01))
 
             current_in_features = layer_size
 
-        print(f"Created {len(self.model_layers)} layers and {len(self.batch_norms)} batch norms")
+        #print(f"Created {len(self.model_layers)} layers and {len(self.batch_norms)} batch norms")
         
     def forward(self, x):
         for i, layer in enumerate(self.model_layers):
@@ -66,13 +65,11 @@ class BINN(nn.Module):
             x = F.linear(x, masked_weight, layer.bias)
 
             # Activation function (except for the last layer)
-            if i < len(self.batch_norms):
+            #if i < len(self.batch_norms):
                 # Re-scale signal
-                x = self.batch_norms[i](x) 
-                # Activation function
-                x = self.activation_fn(x)
-                # Dropout
-                #x = self.dropout(x)
+                # x = self.batch_norms[i](x) 
+            # Activation function
+            x = self.activation_fn(x)
     
         return x
     
