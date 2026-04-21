@@ -33,6 +33,9 @@ def pipeline(
     # read h5ad files, add to datasets dict
     pre.read_files(datasets, pp.conv_data_path)
 
+    # get the order of the original genes (for verification after processing)
+    genes_ordered = datasets[included_labels[0]].var_names.tolist()
+
     #-------PERFORM FILTERING-------
     
     # The cell filtering doesn't actually remove anything from our dataset using
@@ -57,6 +60,9 @@ def pipeline(
     pre.filter_genes(datasets, genes_to_keep)
     
     # NOTE: This pipeline does not filter by HVGs, pseudobulk or normalize the data
+
+    # validates that genes are in original order
+    pre.verify_gene_order(datasets, genes_ordered)
 
     #-------ADD METADATA-------
 
@@ -126,14 +132,6 @@ if __name__ == "__main__":
 
     # Optional argument
     parser.add_argument(
-        "--draw_umaps", 
-        type=bool,
-        default=False,
-        help="Visualize cell sparation. Defualt is False"
-    )
-
-    # Optional argument
-    parser.add_argument(
         "--shared_dir_mode", 
         type=bool,
         default=True,
@@ -146,7 +144,6 @@ if __name__ == "__main__":
     n_top = args.n_top_genes
     min_cells = args.gene_in_min_cells
     min_genes = args.cell_with_min_genes
-    draw_umaps = args.draw_umaps
     nr_common_hvgs = args.nr_common_hvgs
     common_hvg_inc_value = args.common_hvg_inc_value
     shared_dir_mode = args.shared_dir_mode
@@ -158,6 +155,5 @@ if __name__ == "__main__":
         min_cells=min_cells, 
         nr_common_hvgs=nr_common_hvgs, 
         common_hvg_inc_value=common_hvg_inc_value, 
-        draw_umaps=draw_umaps,
         shared_dir_mode = shared_dir_mode
         )

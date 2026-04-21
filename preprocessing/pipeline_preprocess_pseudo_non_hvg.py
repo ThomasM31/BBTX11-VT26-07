@@ -33,6 +33,9 @@ def pipeline(
     # read h5ad files, add to datasets dict
     pre.read_files(datasets, pp.conv_data_path)
 
+    # get the order of the original genes (for verification after processing)
+    genes_ordered = datasets[included_labels[0]].var_names.tolist()
+
     #-------PERFORM FILTERING-------
     
     # The cell filtering doesn't actually remove anything from our dataset using
@@ -57,16 +60,10 @@ def pipeline(
 
     # filter genes
     pre.filter_genes(datasets, genes_to_keep)
-    
-    #-------FILTER HVGs-------
-    
-    # prepare filename to read common hvgs
-    all_labels = pre.get_labels(list(range(0,9)))
-    hvg_common_filename =  f'{"_".join(all_labels)}_common_{nr_common_hvgs}.txt'
-    
-    # filter by common hvgs
-    #pre.filter_common_hvgs(datasets, paths["hvg_common_path"], hvg_common_filename)
 
+    # validates that genes are in original order
+    pre.verify_gene_order(datasets, genes_ordered)
+    
     #-------PSEUDOBULK AND NORMALIZE-------
 
     # sum counts per subject and high res cell type
