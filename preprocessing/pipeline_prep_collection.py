@@ -2,6 +2,7 @@ import preprocess as pre
 import argparse
 import os
 from pathlib import Path
+import pipeline_paths as ppaths
 
 '''
 SECOND PIPELINE TO PREPARE DATA FOR PREPROCESSING.
@@ -14,37 +15,12 @@ def pipeline(
         min_genes: int, 
         min_cells:int,
         nr_common_hvgs:int,
-        common_hvg_inc_value:int,  
-        draw_umaps: bool,
+        common_hvg_inc_value:int,
         shared_dir_mode: bool
         ) -> None:
     
-    if shared_dir_mode:
-        # To read from and write to the shared folder
-        base_path = Path("/data/shared/alzgene26/data")
-    else:
-        ### To read from and write to current users folders
-        user = os.environ.get('USER') or os.environ.get('USERNAME')
-        base_path = Path("/data/users") / user / "kand/data/"
-    
-    processed_data = "processed_data"
     run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{nr_common_hvgs}' 
-
-    paths = {}
-    paths["conv_data_path"]          = base_path / "conv_data"
-    paths["gene_expr_count_path"]    = base_path / processed_data / "expr_counts"
-    paths["genes_keep_path"]         = base_path / processed_data / "filter_genes"
-    paths["hvg_lists_path"]          = base_path / processed_data / "hvg_lists"
-    paths["hvg_common_path"]         = base_path / processed_data / "hvg_common"
-    paths["figures_path"]            = base_path / "figures"
-    paths["metadata_path"]           = base_path / "supplementary_data"
-    paths["completed_path"]          = base_path / processed_data / "completed" / run_vars
-    paths["test_data_path"]          = base_path / processed_data / "test_data"
-    paths["pathway_data_path"]       = base_path / 'PathwayData'
-
-    # create folders if they do not exist
-    for path_name, path  in paths.items():
-        path.mkdir(parents=True, exist_ok=True)
+    pp = ppaths.PipelinePaths(shared_dir_mode, run_vars)
         
     #-------START PROCESSING-------
     
@@ -54,15 +30,14 @@ def pipeline(
     # create empty dict
     datasets = pre.get_datasets(included_labels)
 
-    # read h5ad files, add to datasets dict
-    #pre.read_files(datasets, paths["conv_data_path"])
+    # note: we don't need to read the anndata files for this pipeline
 
     # sum gene expression counts for all datasets, 
     # list all genes that are expressed in more than min_cells in .csv
-    f = paths["genes_keep_path"] / f'genes_to_keep_{min_cells}.csv'
+    f = pp.genes_keep_path / f'genes_to_keep_{min_cells}.csv'
     pre.sum_gene_expr_counts(
         included_labels, 
-        paths["gene_expr_count_path"], 
+        pp.gene_expr_count_path, 
         f, 
         min_cells)    
 
@@ -72,18 +47,18 @@ def pipeline(
     genes_to_keep = []
     # get genes with expression over threshold from file
     genes_to_keep.extend(pre.get_expressed_genes(
-        datasets, paths["genes_keep_path"], min_cells))
+        datasets, pp.genes_keep_path, min_cells))
 
     # get genes that exist in reactome from file
-    save_file = 'reactome_genes.txt'
-    genes_to_keep.extend(pre.get_reactome_genes(datasets, paths["pathway_data_path"], save_file))
+    save_file = Path('reactome_genes.txt')
+    genes_to_keep.extend(pre.get_reactome_genes(datasets, pp.pathway_data_path, save_file))
     genes_to_keep = set(genes_to_keep)
     
     # Find n_top common hvgs from txt files, save to file
     pre.find_common_hvgs(
         datasets, 
-        paths["hvg_lists_path"], 
-        paths["hvg_common_path"],
+        pp.hvg_lists_path, 
+        pp.hvg_common_path,
         n_top_genes, 
         genes_to_keep,
         nr_common_hvgs, 
@@ -147,14 +122,6 @@ if __name__ == "__main__":
 
     # Optional argument
     parser.add_argument(
-        "--draw_umaps", 
-        type=bool,
-        default=False,
-        help="Visualize cell sparation. Defualt is False"
-    )
-
-    # Optional argument
-    parser.add_argument(
         "--shared_dir_mode", 
         type=bool,
         default=True,
@@ -167,7 +134,6 @@ if __name__ == "__main__":
     n_top = args.n_top_genes
     min_cells = args.gene_in_min_cells
     min_genes = args.cell_with_min_genes
-    draw_umaps = args.draw_umaps
     nr_common_hvgs = args.nr_common_hvgs
     common_hvg_inc_value = args.common_hvg_inc_value
     shared_dir_mode = args.shared_dir_mode
@@ -178,7 +144,6 @@ if __name__ == "__main__":
         min_genes=min_genes, 
         min_cells=min_cells, 
         nr_common_hvgs=nr_common_hvgs, 
-        common_hvg_inc_value=common_hvg_inc_value, 
-        draw_umaps=draw_umaps,
+        common_hvg_inc_value=common_hvg_inc_value,
         shared_dir_mode = shared_dir_mode
         )

@@ -2,6 +2,7 @@ import preprocess as pre
 import argparse
 import os
 from pathlib import Path
+import pipeline_paths as ppaths
 
 '''
 FIRST PIPELINE TO PREPARE DATA FOR PREPROCESSING.
@@ -14,38 +15,13 @@ def pipeline(
         min_genes: int, 
         min_cells:int,
         nr_common_hvgs:int,
-        common_hvg_inc_value:int,  
-        draw_umaps: bool,
+        common_hvg_inc_value:int,
         shared_dir_mode: bool
         ) -> None:
     
-    if shared_dir_mode:
-        # To read from and write to the shared folder
-        base_path = Path("/data/shared/alzgene26/data")
-    else:
-        ### To read from and write to current users folders
-        user = os.environ.get('USER') or os.environ.get('USERNAME')
-        base_path = Path("/data/users") / user / "kand/data/"
-    
-    processed_data = "processed_data"
     run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{nr_common_hvgs}' 
+    pp = ppaths.PipelinePaths(shared_dir_mode, run_vars)
 
-    paths = {}
-    paths["conv_data_path"]          = base_path / "conv_data"
-    paths["gene_expr_count_path"]    = base_path / processed_data / "expr_counts"
-    paths["genes_keep_path"]         = base_path / processed_data / "filter_genes"
-    paths["hvg_lists_path"]          = base_path / processed_data / "hvg_lists"
-    paths["hvg_common_path"]         = base_path / processed_data / "hvg_common"
-    paths["figures_path"]            = base_path / "figures"
-    paths["metadata_path"]           = base_path / "supplementary_data"
-    paths["completed_path"]          = base_path / processed_data / "completed" / run_vars
-    paths["test_data_path"]          = base_path / processed_data / "test_data"
-    paths["pathway_data_path"]       = base_path / 'PathwayData'
-
-    # create folders if they do not exist
-    for path_name, path  in paths.items():
-        path.mkdir(parents=True, exist_ok=True)
-        
     #-------START PROCESSING-------
 
     # from int to readable labels
@@ -55,27 +31,27 @@ def pipeline(
     datasets = pre.get_datasets(included_labels)
 
     # read h5ad files, add to datasets dict
-    pre.read_files(datasets, paths["conv_data_path"])
+    pre.read_files(datasets, pp.conv_data_path)
 
     #-------FILTERING PREP FOR PER GENE FILTERING-------
     for label, adata in datasets.items():
-        f = paths["gene_expr_count_path"] / f'{label}.csv'
+        f = pp.gene_expr_count_path / f'{label}.csv'
         # writes gene expression count per dataset to .csv
         d = {label:adata}
-        pre.write_gene_expr_count(d, paths["gene_expr_count_path"])     
+        pre.write_gene_expr_count(d, pp.gene_expr_count_path)     
 
     # save genes that exist in reactome to file
     source_file = 'ReactomePathways.gmt'
     save_file = 'reactome_genes.txt'
-    pre.save_reactome_genes(paths["pathway_data_path"], source_file, save_file)
+    pre.save_reactome_genes(pp.pathway_data_path, source_file, save_file)
     
     # make one .txt file for each cell type with 
     # genes sorted from most to least variable
     # this method does not require normalized data
     for label, adata in datasets.items():
-        f = paths["hvg_lists_path"] / f'{label}.txt'
+        f = pp.hvg_lists_path / f'{label}.txt'
         d = {label:adata}
-        pre.extract_hvgs_full_list(d, paths["hvg_lists_path"])
+        pre.extract_hvgs_full_list(d, pp.hvg_lists_path)
     
     print('Pipeline completed')
 
@@ -153,7 +129,6 @@ if __name__ == "__main__":
     n_top = args.n_top_genes
     min_cells = args.gene_in_min_cells
     min_genes = args.cell_with_min_genes
-    draw_umaps = args.draw_umaps
     nr_common_hvgs = args.nr_common_hvgs
     common_hvg_inc_value = args.common_hvg_inc_value
     shared_dir_mode = args.shared_dir_mode
@@ -165,6 +140,5 @@ if __name__ == "__main__":
         min_cells=min_cells, 
         nr_common_hvgs=nr_common_hvgs, 
         common_hvg_inc_value=common_hvg_inc_value, 
-        draw_umaps=draw_umaps,
         shared_dir_mode = shared_dir_mode
         )

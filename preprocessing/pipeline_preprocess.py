@@ -2,6 +2,7 @@ import preprocess as pre
 import argparse
 import os
 from pathlib import Path
+import pipeline_paths as ppaths
 
 '''
 THE ACTUAL PREPROCESSING PIPELINE. USES DATA CREATED BY THE FIRST TWO PREP PIPELINES.
@@ -14,37 +15,12 @@ def pipeline(
         min_genes: int, 
         min_cells:int,
         nr_common_hvgs:int,
-        common_hvg_inc_value:int,  
-        draw_umaps: bool,
+        common_hvg_inc_value:int,
         shared_dir_mode: bool
         ) -> None:
     
-    if shared_dir_mode:
-        # To read from and write to the shared folder
-        base_path = Path("/data/shared/alzgene26/data")
-    else:
-        ### To read from and write to current users folders
-        user = os.environ.get('USER') or os.environ.get('USERNAME')
-        base_path = Path("/data/users") / user / "kand/data/"
-    
-    processed_data = "processed_data"
     run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{nr_common_hvgs}' 
-
-    paths = {}
-    paths["conv_data_path"]          = base_path / "conv_data"
-    paths["gene_expr_count_path"]    = base_path / processed_data / "expr_counts"
-    paths["genes_keep_path"]         = base_path / processed_data / "filter_genes"
-    paths["hvg_lists_path"]          = base_path / processed_data / "hvg_lists"
-    paths["hvg_common_path"]         = base_path / processed_data / "hvg_common"
-    paths["figures_path"]            = base_path / "figures"
-    paths["metadata_path"]           = base_path / "supplementary_data"
-    paths["completed_path"]          = base_path / processed_data / "completed" / run_vars
-    paths["test_data_path"]          = base_path / processed_data / "test_data"
-    paths["pathway_data_path"]       = base_path / 'PathwayData'
-
-    # create folders if they do not exist
-    for path_name, path  in paths.items():
-        path.mkdir(parents=True, exist_ok=True)
+    pp = ppaths.PipelinePaths(shared_dir_mode, run_vars)
         
     #-------START PROCESSING-------
     
@@ -55,7 +31,7 @@ def pipeline(
     datasets = pre.get_datasets(included_labels)
 
     # read h5ad files, add to datasets dict
-    pre.read_files(datasets, paths["conv_data_path"])
+    pre.read_files(datasets, pp.conv_data_path)
 
     #-------PERFORM FILTERING-------
     
@@ -72,12 +48,12 @@ def pipeline(
     
     # get genes with expression over threshold from file
     genes_to_keep.append(pre.get_expressed_genes(
-        datasets, paths["genes_keep_path"], min_cells)
+        datasets, pp.genes_keep_path, min_cells)
         )
 
     # get genes that exist in reactome from file
-    save_file = 'reactome_genes.txt'
-    genes_to_keep.append(pre.get_reactome_genes(datasets, paths["pathway_data_path"], save_file))
+    save_file = Path('reactome_genes.txt')
+    genes_to_keep.append(pre.get_reactome_genes(datasets, pp.pathway_data_path, save_file))
 
     # filter genes
     pre.filter_genes(datasets, genes_to_keep)
@@ -89,7 +65,7 @@ def pipeline(
     hvg_common_filename =  f'{"_".join(all_labels)}_common_{nr_common_hvgs}.txt'
     
     # filter by common hvgs
-    pre.filter_common_hvgs(datasets, paths["hvg_common_path"], hvg_common_filename)
+    pre.filter_common_hvgs(datasets, pp.hvg_common_path, hvg_common_filename)
 
     #-------PSEUDOBULK AND NORMALIZE-------
 
@@ -102,14 +78,7 @@ def pipeline(
     #-------ADD METADATA-------
 
     # add disease status
-    pre.add_metadata(datasets, paths["metadata_path"])
-
-    #-------UMAPS-------
-
-    # visualize how the preprocessing has improved (?) 
-    # separation of cells (slow and uses a lot of memory!!)
-    # for this one it is better to load each data set separately
-    #if draw_umaps: pre.draw_umaps(datasets=datasets, paths["figures_path"])
+    pre.add_metadata(datasets, pp.metadata_path)
 
     #-------MOVE PROCESSED DATA TO MAIN LAYER AND SAVE-------
     
@@ -117,7 +86,7 @@ def pipeline(
     # this will make the files a lot smaller
     pre.move_pseudo_main(datasets)
 
-    pre.save_files(datasets, paths["completed_path"], 'completed')
+    pre.save_files(datasets, pp.compl_full_pipe_path, 'completed')
     
     print('Pipeline completed')
 
@@ -176,14 +145,6 @@ if __name__ == "__main__":
 
     # Optional argument
     parser.add_argument(
-        "--draw_umaps", 
-        type=bool,
-        default=False,
-        help="Visualize cell sparation. Defualt is False"
-    )
-
-    # Optional argument
-    parser.add_argument(
         "--shared_dir_mode", 
         type=bool,
         default=True,
@@ -196,7 +157,6 @@ if __name__ == "__main__":
     n_top = args.n_top_genes
     min_cells = args.gene_in_min_cells
     min_genes = args.cell_with_min_genes
-    draw_umaps = args.draw_umaps
     nr_common_hvgs = args.nr_common_hvgs
     common_hvg_inc_value = args.common_hvg_inc_value
     shared_dir_mode = args.shared_dir_mode
@@ -207,7 +167,6 @@ if __name__ == "__main__":
         min_genes=min_genes, 
         min_cells=min_cells, 
         nr_common_hvgs=nr_common_hvgs, 
-        common_hvg_inc_value=common_hvg_inc_value, 
-        draw_umaps=draw_umaps,
+        common_hvg_inc_value=common_hvg_inc_value,
         shared_dir_mode = shared_dir_mode
         )
