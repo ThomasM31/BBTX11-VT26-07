@@ -18,7 +18,7 @@
 mkdir -p logs
 
 # Define a central status log for the whole array
-STATUS_LOG="logs/array_${SLURM_ARRAY_JOB_ID}_summary.log"
+STATUS_LOG="logs/${SLURM_ARRAY_JOB_ID}_summary.log"
 
 # Log Start Time
 START_TIME=$(date)
@@ -35,7 +35,7 @@ export PYTHONUNBUFFERED=1
 
 # Run the Python script
 # We use 'time' to see how long the Python process actually took
-time python3 -u pipeline_prep_collection.py 0 1 2 3 4 5 6 7 8 --draw_umaps False
+time python3 -u pipeline_prep_collection.py 0 1 2 3 4 5 6 7 8
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?
