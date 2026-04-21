@@ -400,7 +400,7 @@ def main(
                 out_path = OUTPUT_DIR / data_info / f"{save_name}_layer_{i}_mask.csv"
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 m.to_csv(out_path)
-                print(f"      Saved: {out_path} (Shape: {m.shape}) to {out_path}")
+                print(f"Saved: (Shape: {m.shape}) to {out_path}")
                 
         except Exception as e:
             print(f"      [ERROR] could not process {cell_name}: {e}")
