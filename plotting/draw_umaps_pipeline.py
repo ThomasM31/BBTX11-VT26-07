@@ -16,7 +16,7 @@ def pipeline(
         shared_dir_mode: bool
         ) -> None:
     
-    pp = ppaths.PipelinePaths(shared_dir_mode, proc_dir.parts[-1])
+    pp = ppaths.PipelinePaths(shared_dir_mode)
     save_path = pp.figures_path / proc_dir
     save_path.mkdir(parents=True, exist_ok=True)
 
