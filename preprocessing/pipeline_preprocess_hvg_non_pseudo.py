@@ -33,6 +33,10 @@ def pipeline(
     # read h5ad files, add to datasets dict
     pre.read_files(datasets, pp.conv_data_path)
 
+    # get the order of the original genes (for verification after processing)
+    genes_ordered = datasets[included_labels[0]].var_names.tolist()
+
+
     #-------PERFORM FILTERING-------
     
     # The cell filtering doesn't actually remove anything from our dataset using
@@ -67,25 +71,15 @@ def pipeline(
     # filter by common hvgs
     pre.filter_common_hvgs(datasets, pp.hvg_common_path, hvg_common_filename)
 
-    #-------PSEUDOBULK AND NORMALIZE-------
-
-    # sum counts per subject and high res cell type
-    #pre.pseudobulk(datasets)
-    
-    #  normalize per pseudobulk sample
-    #pre.normalize(datasets)
+    # validates that genes are in original order
+    pre.verify_gene_order(datasets, genes_ordered)
 
     #-------ADD METADATA-------
 
     # add disease status
     pre.add_metadata_non_pseudo(datasets, pp.metadata_path)
 
-
     #-------MOVE PROCESSED DATA TO MAIN LAYER AND SAVE-------
-    
-    # move pseudobulk data to main layer, discard everything else
-    # this will make the files a lot smaller
-    #pre.move_pseudo_main(datasets)
     
     pre.move_hvgs_main(datasets)
     

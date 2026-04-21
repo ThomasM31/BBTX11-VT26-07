@@ -394,6 +394,12 @@ def main(
             
             # Generate matrixes
             matrices = pn.get_connectivity_matrices(n_layers=n_layers)
+
+            target_dir = OUTPUT_DIR / data_info
+            if (OUTPUT_DIR / data_info).exists():
+                for old_file in target_dir.glob("*.csv"):
+                    old_file.unlink()
+                print(f"Cleaned up existing .csv files in {target_dir}")
             
             for i, m in enumerate(matrices):
                 save_name = save_str if save_str != '' else cell_name 

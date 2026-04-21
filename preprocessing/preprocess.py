@@ -145,17 +145,18 @@ def save_reactome_genes(
         filepath: Path,
         filename_read: str,
         filename_save: str
-        ) -> list[str]:
+        ) -> None:
     '''
-    Exclude genes that are not present in the Reactome database.
-    This so that we will not have genes in our final training data 
-    that are not connected to a pathway or process in the neural network.
+    Save a list of genes that are present in the Reactome database.
+    For later filtering of genes, so that we will not have genes in our 
+    final training data that are not connected to a pathway or process 
+    in the neural network.
     '''
     # Read GMT-files to extract all genes in reactome database
     # GMT files contain entries with:
     # pathway name | pathway ID | list of associated genes
 
-    print(f'Filtering out genes not present in Reactome.')
+    print(f'Saving list of genes that are in Reactome')
     
     reactome_genes = set()
     with open(filepath / filename_read, 'r') as lines:
@@ -189,16 +190,22 @@ def get_reactome_genes(
 
 def filter_genes(datasets: dict, genes_to_keep: list[list[str]]) -> None:
 
+    # get the genes that are in the intersection of all filter lists
+    rel_genes = set(genes_to_keep[0])
+    for gene_list in genes_to_keep:
+        rel_genes &= set(gene_list)
+
     for label, adata in datasets.items():
-        old_genes = adata.n_vars
-        rel_genes = set(adata.var_names)
-        for gene_list in genes_to_keep:
-            rel_genes &= set(gene_list)
+        nr_old_genes = adata.n_vars
+        adata_genes = adata.var_names
+
+        # final filtering of adata genes is done on a list to keep the order
+        keep = [g for g in adata_genes if g in rel_genes]
         
-        datasets[label] = adata[:, list(rel_genes)]
-        new_genes = datasets[label].n_vars
+        datasets[label] = adata[:, keep]
+        nr_new_genes = datasets[label].n_vars
         print('Gene filtering completed.')
-        print(f"{label}: {old_genes} -> {new_genes} genes (removed {old_genes - new_genes})")
+        print(f"{label}: {nr_old_genes} -> {nr_new_genes} genes (removed {nr_old_genes - nr_new_genes})")
 
 
 def prep_for_hvg_sel(datasets: dict) -> None:
@@ -347,6 +354,30 @@ def filter_common_hvgs(
         print(f'Writing common hvgs to datset for {label}.')
         print(datasets[label].uns['common_hvgs'])
 
+def verify_gene_order(datasets: dict, master_gene_order: list) -> None:
+    """
+    Ensures the genes in each dataset follow the relative order 
+    of the provided master_gene_order, 
+    to verify that order has not been changed in any filtering step.
+    """
+    gene_to_index = {gene: i for i, gene in enumerate(master_gene_order)}
+    
+    for label, adata in datasets.items():
+        current_genes = adata.var_names.tolist()
+        
+        # Get the original indices for the filtered genes
+        try:
+            current_indices = [gene_to_index[g] for g in current_genes]
+        except KeyError as e:
+            raise KeyError(f"Gene {e} in dataset '{label}' was not found in the master order.")
+
+        # Check if indices are strictly increasing
+        if current_indices != sorted(current_indices):
+            raise ValueError(
+                f"ORDER MISMATCH: Genes in dataset '{label}' are not in the original relative order."
+            )
+            
+    print("SUCCESS: All datasets maintain original relative gene order.")
 
 def pseudobulk(datasets: dict) -> None:
     # Perform pseudobulk by test subject and high res celltype
