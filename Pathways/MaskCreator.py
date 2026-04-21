@@ -301,7 +301,7 @@ class PathwayNetwork:
         terminal_pathways = {re.sub(r"_copy.*", "", n) for n in terminal_nodes}
 
         non_terminal_annotated = all_annotated_pathways - terminal_pathways
-        print(f"Genes mapped to intermediate pathways: {len(non_terminal_annotated)}")
+        print(f"Non-terminal pathways with gene conns: {len(non_terminal_annotated)}")
         
         # TODO: this is the logic that we need to change if 
         # we want to map genes to intermediate pathways
