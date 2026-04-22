@@ -35,7 +35,7 @@ class BINN(nn.Module):
         # Create the linear layers & batch normalizations dynamically
         self.model_layers = nn.ModuleList()
         # Add LayerNorms (TODO: TEST)
-        self.layer_norms = nn.ModuleList() 
+        self.layer_norms = nn.ModuleList()
 
         current_in_features = in_features
 

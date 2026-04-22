@@ -1,31 +1,14 @@
-# general imports
-import sys
-from tqdm import tqdm
-
 # sklearn
 from sklearn.model_selection import cross_val_score, GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
 from sklearn.decomposition import PCA
-from sklearn.base import clone
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, roc_auc_score, roc_curve
 
 # anndata
 import anndata as ad
-from anndata.experimental import AnnCollection
-
-# 
-import numpy as np
-import scanpy as sc
-import seaborn as sns
-import matplotlib.pyplot as plt 
 
 # Own files
 from BINN import custom_train_test_split as ctts
-
-LABELS = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
-base_path = "/data/shared/alzgene26/data"
-data_path = base_path + "/processed_data/completed/mg_200_mc_200_mhvg1000/"
 
 def read_adata(indices: list, train_size=0.8):
     train_adata, test_adata, collection = ctts.pipeline(indices, data_path, train_size)
@@ -44,9 +27,13 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
 
     # Support Vector Machine, icke-linjär
     print("Creating model...")
-    clf_svm = SVC(C=1, probability=True, gamma=0.001, kernel='rbf', class_weight='balanced') 
+    clf_svm = SVC(C=1, 
+                  probability=True, 
+                  gamma=0.001, 
+                  kernel='rbf', 
+                  class_weight='balanced') 
 
-    # PCA
+    # PCA TODO: testa utan
     pca = PCA(n_components=50)
     X_train_pca = pca.fit_transform(X_train)
     X_test_pca = pca.transform(X_test)
@@ -83,15 +70,19 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     print(classification_report(y_test, y_pred))
 
 
+LABELS = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
+base_path = "/data/shared/alzgene26/data"
+data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
+
 # indices: 0=astro, 1=exc1, 2=exc2, 3=exc3, 4=immune, 5=inhi, 6=oligo, 7=opcs, 8=vasc
 print("Reading adata...")
+#train_adata, test_adata, acollection = read_adata([0], train_size=0.8)
 train_adata, test_adata, acollection = read_adata([0,1,2,3,4,5,6,7,8], train_size=0.8)
 baseline_model(train_adata, test_adata)
 
 # AUC and Mean CV AUC
-svm_dataset_performances = {"ALL": "AUC: 0.5612 Mean CV AUC: 0.6649",
+svm_dataset_performances = {"ALL": "AUC: 0.5612 Mean CV AUC: 0.6649", # highest mean CV AUC: 0.7018
                         "astro": "AUC: 0.6796, Mean CV AUC: 0.6597",
-                        "astro_mod": "AUC: 0.6788, Mean CV AUC: 0.6597",
                         "exc1": "AUC: 0.6049, Mean CV AUC: 0.7031",
                         "exc2": "AUC: 0.6399, Mean CV AUC: 0.6682",
                         "exc3": "AUC: 0.6057, Mean CV AUC: 0.6246",
@@ -99,7 +90,7 @@ svm_dataset_performances = {"ALL": "AUC: 0.5612 Mean CV AUC: 0.6649",
                         "inhi": "AUC: 0.5569, Mean CV AUC: 0.5980",
                         "oligo": "AUC: 0.6375, Mean CV AUC: 0.6965",
                         "opcs": "AUC: 0.5826, Mean CV AUC: 0.6591",
-                        "vasc": "AUC: 0.6457, Mean CV AUC: 0.5679", # NOTE: RED-FLAG (tur med test split)
+                        "vasc": "AUC: 0.6457, Mean CV AUC: 0.5679",
                         }
 
 

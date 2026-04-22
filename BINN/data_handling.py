@@ -155,7 +155,7 @@ def pad_align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         #print(f"Final shape: {adata_ordered.shape}\n")
     return datasets_padded
 
-def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=0.001):
+def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=5e-3):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
     """
@@ -164,7 +164,7 @@ def create_model(in_features:int, layers_list:list, tensor_masks:list, device, o
                   mask_list=tensor_masks).to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
 
     return model, criterion, optimizer, scheduler
@@ -185,7 +185,7 @@ def training_loop(model: BINN,
         train_loss, train_acc = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
         test_loss, test_acc = bt.test_one_epoch(model, test_loader, criterion, device)
         
-        scheduler.step(test_loss)
+        #scheduler.step(test_loss)
         
         print(f"Epoch {epoch+1} / {epochs}")
         print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
@@ -197,7 +197,7 @@ base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
 
 # GLOBALS
-EPOCHS = 30
+EPOCHS = 40
 TRAIN_SIZE = 0.8
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
