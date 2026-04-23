@@ -188,7 +188,7 @@ def rollup_to_patient_level(datasets: dict) -> dict:
         
         # 4. Re-attach the metadata (AD_status, etc.)
         # We grab the first occurrence of the label for each subject
-        meta = adata.obs.groupby('subject').agg({
+        meta = adata.obs.groupby('subject', observed=False).agg({
             'AD_status': 'first',
             'n_obs_aggregated': 'sum'
         })
