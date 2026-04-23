@@ -1,5 +1,9 @@
-from torch.utils.data import DataLoader
-import custom_train_test_split as ctts
+# Own files
+import BINN.custom_train_test_split as ctts
+from BINN.Binn import BINN
+import BINN.binn_training as bt
+#from BINN.regNN import ShallowMLP
+
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
 import os
@@ -7,9 +11,6 @@ import pandas as pd, numpy as np
 from scipy.sparse import csr_matrix
 import torch.nn as nn
 import torch
-from Binn import BINN
-from regNN import ShallowMLP
-import binn_training as bt
 import scanpy as sc
 
 def data_concatenate(acollection : AnnCollection):

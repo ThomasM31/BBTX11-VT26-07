@@ -1,6 +1,6 @@
 import torch
 from anndata.experimental import AnnLoader
-from Binn import BINN
+from BINN.Binn import BINN
 import torch.nn as nn
 import torch.optim
 
