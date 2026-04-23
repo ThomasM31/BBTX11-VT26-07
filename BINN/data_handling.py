@@ -287,10 +287,10 @@ def pipeline() -> None:
     in_features, layers_list, tensor_masks = compute_features(masks, device)
 
     print("Creating BINN...")
-    #model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
-    model = ShallowMLP(in_features=945, hidden_size=128).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=0)
-    criterion = nn.BCEWithLogitsLoss()
+    model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
+    #model = ShallowMLP(in_features=945, hidden_size=128).to(device)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=0)
+    #criterion = nn.BCEWithLogitsLoss()
     print(model)
     scheduler = 0
 

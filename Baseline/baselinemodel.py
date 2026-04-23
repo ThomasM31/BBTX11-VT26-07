@@ -2,14 +2,18 @@
 from sklearn.model_selection import cross_val_score, GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
 from sklearn.decomposition import PCA
+from sklearn.base import clone
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, roc_auc_score, roc_curve
+import BINN.data_handling as dh
+import BINN.custom_train_test_split as ctts
 
 # anndata
 import anndata as ad
+from anndata.experimental import AnnCollection
 
 # Own files
 from BINN import custom_train_test_split as ctts
-
 def read_adata(indices: list, train_size=0.8):
     train_adata, test_adata, collection = ctts.pipeline(indices, data_path, train_size)
     return train_adata, test_adata, collection
@@ -69,19 +73,40 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     y_pred = clf_svm.predict(X_test_pca)
     print(classification_report(y_test, y_pred))
 
-
+# GLOBALS
 LABELS = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
+ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
+MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+              for i in range(5)]
+TRAIN_SIZE = 0.8
 
-# indices: 0=astro, 1=exc1, 2=exc2, 3=exc3, 4=immune, 5=inhi, 6=oligo, 7=opcs, 8=vasc
-print("Reading adata...")
+
+# Pipeline -------------------------------------------------------------------
+print("Reading processed adata...")
 #train_adata, test_adata, acollection = read_adata([0], train_size=0.8)
-train_adata, test_adata, acollection = read_adata([0,1,2,3,4,5,6,7,8], train_size=0.8)
+datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
+print("Dataset rollup...")
+patient_datasets = dh.rollup_to_patient_level(datasets)
+print("Renormalizing data...")
+datasets_norm = dh.renormalize(patient_datasets)
+print("Reading masks...")
+masks = dh.read_masks(MASK_PATHS, print_shapes=True)
+print("Aligning adatas to BINN...")
+datasets_aligend = dh.subset_genes(datasets_norm, masks['df0'])
+print("Padding adatas to BINN-ready shape...")
+datasets_padded = dh.pad_align_data(datasets_aligend, masks["df0"])
+print("Creating AnnCollection...")
+acollection = ctts.create_encoded_collection(datasets_padded)
+print("Creating train/test split...")
+train_adata, test_adata = ctts.custom_train_test_split(acollection, train_size=TRAIN_SIZE)
+
+# -------------------------------------------------------------------
 baseline_model(train_adata, test_adata)
 
 # AUC and Mean CV AUC
-svm_dataset_performances = {"ALL": "AUC: 0.5612 Mean CV AUC: 0.6649", # highest mean CV AUC: 0.7018
+svm_dataset_performances = {"ALL": "AUC: 0.5641 Mean CV AUC: 0.8033", 
                         "astro": "AUC: 0.6796, Mean CV AUC: 0.6597",
                         "exc1": "AUC: 0.6049, Mean CV AUC: 0.7031",
                         "exc2": "AUC: 0.6399, Mean CV AUC: 0.6682",
