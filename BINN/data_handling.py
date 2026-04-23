@@ -178,7 +178,7 @@ def rollup_to_patient_level(datasets: dict) -> dict:
         
         # 2. Group by subject and sum
         # This is the "Real" pseudobulking step
-        summed_df = df.groupby(level=0).sum()
+        summed_df = df.groupby(level=0, observed=False).sum()
         
         # 3. Create the new AnnData from the summed DataFrame
         # This GUARANTEES .X is populated and has a .dtype
