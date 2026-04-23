@@ -8,7 +8,9 @@ from scipy.sparse import csr_matrix
 import torch.nn as nn
 import torch
 from Binn import BINN
+from regNN import ShallowMLP
 import binn_training as bt
+import scanpy as sc
 
 def data_concatenate(acollection : AnnCollection):
     """
@@ -155,7 +157,77 @@ def pad_align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         #print(f"Final shape: {adata_ordered.shape}\n")
     return datasets_padded
 
-def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=5e-3):
+def rollup_to_patient_level(datasets: dict) -> dict:
+    """
+    Pseudobulk per patient only
+    """
+    patient_level_datasets = {}
+    
+    for label in (datasets.keys()):
+        adata = datasets[label]
+        print(f"Rolling up '{label}'...")
+        
+        # 1. Convert the sums and the subject names to a DataFrame
+        # We use .layers['sum'] to ensure we have the raw counts
+        df = pd.DataFrame(
+            adata.layers['sum'], 
+            index=adata.obs['subject'], 
+            columns=adata.var_names
+        )
+        
+        # 2. Group by subject and sum
+        # This is the "Real" pseudobulking step
+        summed_df = df.groupby(level=0).sum()
+        
+        # 3. Create the new AnnData from the summed DataFrame
+        # This GUARANTEES .X is populated and has a .dtype
+        patient_pseudo = ad.AnnData(X=summed_df.values)
+        patient_pseudo.obs_names = summed_df.index.astype(str)
+        patient_pseudo.var_names = summed_df.columns.astype(str)
+        
+        # 4. Re-attach the metadata (AD_status, etc.)
+        # We grab the first occurrence of the label for each subject
+        meta = adata.obs.groupby('subject').agg({
+            'AD_status': 'first',
+            'n_obs_aggregated': 'sum'
+        })
+        
+        # Align metadata with the new rows
+        patient_pseudo.obs['subject'] = patient_pseudo.obs_names
+        patient_pseudo.obs['n_obs_aggregated'] = meta.loc[patient_pseudo.obs_names, 'n_obs_aggregated']
+        patient_pseudo.obs["cell_type_high_resolution"] = label
+        patient_pseudo.obs['AD_status'] = meta.loc[patient_pseudo.obs_names, 'AD_status']
+
+        # 5. Convert to sparse matrix (Scanpy prefers this for memory)
+        patient_pseudo.X = csr_matrix(patient_pseudo.X)
+        
+        patient_level_datasets[label] = patient_pseudo
+        
+    return patient_level_datasets
+
+def renormalize(datasets:dict) -> dict:
+    """
+    Renormalize data after summing raw counts per subject
+    """
+    for label, adata in datasets.items():
+        # 1. Verification of the matrix range
+        raw_max = adata.X.max()
+        
+        # 2. Run the pipeline (Ignore the warning)
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        sc.pp.log1p(adata)
+        sc.pp.scale(adata, max_value=10)
+        
+        scaled_max = adata.X.max()
+        scaled_mean = adata.X.mean()
+        
+        print(f"--- {label} ---")
+        print(f"Pre-scaling Max: {raw_max:.2f}")
+        print(f"Post-scaling Max: {scaled_max:.2f} (Should be near 10)")
+        print(f"Post-scaling Mean: {scaled_mean:.4f} (Should be near 0)")
+    return datasets
+
+def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=1e-4):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
     """
@@ -164,7 +236,7 @@ def create_model(in_features:int, layers_list:list, tensor_masks:list, device, o
                   mask_list=tensor_masks).to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=0)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
 
     return model, criterion, optimizer, scheduler
@@ -214,7 +286,12 @@ def pipeline() -> None:
     in_features, layers_list, tensor_masks = compute_features(masks, device)
 
     print("Creating BINN...")
-    model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
+    #model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
+    model = ShallowMLP(in_features=945, hidden_size=128).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=0)
+    criterion = nn.BCEWithLogitsLoss()
+    print(model)
+    scheduler = 0
 
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
@@ -222,11 +299,12 @@ def pipeline() -> None:
     print("Aligning adatas to BINN...")
     datasets_aligend = subset_genes(datasets, masks['df0'])
 
-    print("Padding adatas to BINN-ready shape...")
-    datasets_padded = pad_align_data(datasets_aligend, masks["df0"])
+    # TODO: Delete? Should not be needed?
+    #print("Padding adatas to BINN-ready shape...")
+    #datasets_padded = pad_align_data(datasets_aligend, masks["df0"])
 
     print("Creating AnnCollection...")
-    acollection = ctts.create_encoded_collection(datasets_padded)
+    acollection = ctts.create_encoded_collection(datasets_aligend)
 
     print("Creating train/test split...")
     train_adata, test_adata = ctts.custom_train_test_split(acollection, train_size=TRAIN_SIZE)
