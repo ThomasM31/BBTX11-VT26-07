@@ -1,8 +1,9 @@
 import torch
 from anndata.experimental import AnnLoader
-from BINN.Binn import BINN
+from Binn import BINN
 import torch.nn as nn
 import torch.optim
+import pandas as pd
 
 def train_one_epoch(model: BINN, 
                     train_loader: AnnLoader, 
@@ -20,12 +21,14 @@ def train_one_epoch(model: BINN,
     for batch in train_loader:
         # fetch inputs and convert to tensor
         inputs = batch.X.float().to(device)
-        # fetch labels and convert to tensor
-        labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
+        # fetch labels and convert to tensor (Convert in different ways depending on of Series)
+        if type(batch.obs["AD_status"]) is pd.Series:
+            labels = torch.tensor(batch.obs['AD_status'].values.astype(float)).float().reshape(-1, 1).to(device)
+        else:
+            labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
 
-        # zero parameter gradients
         optimizer.zero_grad()
-        
+
         # Forward pass
         outputs = model(inputs)
         loss = criterion(outputs, labels)
@@ -35,9 +38,9 @@ def train_one_epoch(model: BINN,
         optimizer.step()
 
         # Metrics
-        predicted = (outputs > 0.5).float()
+        predicted = (outputs > 0.0).float()
         correct += (predicted == labels).sum().item()
-        # .size(0) gets the length of inputs
+
         running_loss += loss.item() * inputs.size(0)
         total += labels.size(0)
 
@@ -63,14 +66,17 @@ def test_one_epoch(model: BINN,
         for batch in test_loader:
             # fetch inputs and convert to tensor
             inputs = batch.X.float().to(device)
-            # fetch labels and convert to tensor
-            labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
-            
+            # fetch labels and convert to tensor (Convert in different ways depending on of Series)
+            if type(batch.obs["AD_status"]) is pd.Series:
+                labels = torch.tensor(batch.obs['AD_status'].values.astype(float)).float().reshape(-1, 1).to(device)
+            else:
+                labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
+
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             
             running_loss += loss.item() * inputs.size(0)
-            predicted = (outputs > 0.5).float()
+            predicted = (outputs > 0.0).float()
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
     
