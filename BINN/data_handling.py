@@ -1,7 +1,7 @@
 # Own files
-import BINN.custom_train_test_split as ctts
-from BINN.Binn import BINN
-import BINN.binn_training as bt
+import custom_train_test_split as ctts
+from Binn import BINN
+import binn_training as bt
 #from BINN.regNN import ShallowMLP
 
 import anndata as ad
@@ -32,6 +32,9 @@ def train_test_adatasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
     return X_train, y_train, X_test, y_test
 
 def process_completed_data(datasets: dict) -> dict:
+    """
+    Copy pseudobulked layer from large anndata files
+    """
     datasets_proc = {}
     for label, dataset in datasets.items():
         print(f"fetching pseudo from {label}")
@@ -83,6 +86,18 @@ def read_masks(mask_paths, print_shapes=False) -> dict:
     return mask_dict
 
 def compute_features(masks:dict, device) -> tuple[int, list, list]:
+    """
+    Extract biological layer information for the BINN. 
+    Args:
+        in_features(integer): Number of input featues (e.g. number of relevant genes).
+
+        layer_list(list of integers): A list defining the number of neurons in each
+            biological layer. The length of the list determines the amount of layers.
+
+        mask_list(list of torch.Tensor): A list of binary tensors used to restrict the 
+            connectivity between layers.
+            Mask 0 shape: (layer_list)
+    """
     #Extracting pure number representation matrices
     mask_matrix_list = [masks[mask].to_numpy() for mask in masks]
     # Starting amount of features
@@ -168,26 +183,23 @@ def rollup_to_patient_level(datasets: dict) -> dict:
         adata = datasets[label]
         print(f"Rolling up '{label}'...")
         
-        # 1. Convert the sums and the subject names to a DataFrame
-        # We use .layers['sum'] to ensure we have the raw counts
+        # Convert the sums and the subject names to a DataFrame
+        # .layers['sum'] gives raw counts
         df = pd.DataFrame(
             adata.layers['sum'], 
             index=adata.obs['subject'], 
             columns=adata.var_names
         )
         
-        # 2. Group by subject and sum
-        # This is the "Real" pseudobulking step
+        # Group by subject and sum
         summed_df = df.groupby(level=0, observed=False).sum()
         
-        # 3. Create the new AnnData from the summed DataFrame
-        # This GUARANTEES .X is populated and has a .dtype
+        # Create the new AnnData from the summed DataFrame
         patient_pseudo = ad.AnnData(X=summed_df.values)
         patient_pseudo.obs_names = summed_df.index.astype(str)
         patient_pseudo.var_names = summed_df.columns.astype(str)
         
-        # 4. Re-attach the metadata (AD_status, etc.)
-        # We grab the first occurrence of the label for each subject
+        # Re-attach metadata (AD_status, etc.)
         meta = adata.obs.groupby('subject', observed=False).agg({
             'AD_status': 'first',
             'n_obs_aggregated': 'sum'
@@ -199,7 +211,7 @@ def rollup_to_patient_level(datasets: dict) -> dict:
         patient_pseudo.obs["cell_type_high_resolution"] = label
         patient_pseudo.obs['AD_status'] = meta.loc[patient_pseudo.obs_names, 'AD_status']
 
-        # 5. Convert to sparse matrix (Scanpy prefers this for memory)
+        # Convert to sparse matrix (Scanpy prefers this for memory)
         patient_pseudo.X = csr_matrix(patient_pseudo.X)
         
         patient_level_datasets[label] = patient_pseudo
