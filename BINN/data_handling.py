@@ -134,7 +134,7 @@ def subset_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
         datasets_aligned.update({label: adata_aligned})
 
         print(f"Overlapping genes kept: {adata_aligned.n_vars} for {label}")
-        print(f"Genes dropped: {adata.n_vars - adata_aligned.n_vars}\n")
+        #print(f"Genes dropped: {adata.n_vars - adata_aligned.n_vars}\n")
 
     return datasets_aligned
 
