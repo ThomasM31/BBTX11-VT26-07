@@ -6,6 +6,7 @@ import binn_training as bt
 
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
+from sklearn.metrics import roc_auc_score
 import os
 import pandas as pd, numpy as np
 from scipy.sparse import csr_matrix
@@ -342,6 +343,8 @@ def poison_scanner(dataloader: AnnLoader, device) -> None:
         if torch.isnan(labels).any():
             print(f"CRITICAL ERROR: NaN found in labels at batch {i}!")
             break
+    
+    print("No poison found!")
 
 def renormalize(datasets:dict) -> dict:
     """
@@ -365,7 +368,7 @@ def renormalize(datasets:dict) -> dict:
         print(f"Post-scaling Mean: {scaled_mean:.4f} (Should be near 0)")
     return datasets
 
-def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=1e-4, weight_decay=1e-3):
+def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=1e-4, weight_decay_opt=1e-4):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
     """
@@ -374,7 +377,7 @@ def create_model(in_features:int, layers_list:list, tensor_masks:list, device, o
                   mask_list=tensor_masks).to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=1e-2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=weight_decay_opt)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
 
     return model, criterion, optimizer, scheduler
@@ -410,6 +413,39 @@ def training_loop(model: BINN,
         history['test_acc'].append(test_acc)
     
     return history
+
+def evaluate_model_roc(model, test_loader: AnnLoader, device):
+    """
+    Evaluate model with ROC-AUC
+    """
+    model.eval()
+    all_probs = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for batch in test_loader:
+            inputs = batch.X.float().to(device)
+
+            if type(batch.obs["AD_status"]) is pd.Series:
+                labels = torch.tensor(batch.obs['AD_status'].values.astype(float)).float().reshape(-1, 1).to(device)
+            else:
+                labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
+            
+            logits = model(inputs)
+            # Apply sigmoid to get probabilities [0, 1]
+            probs = torch.sigmoid(logits).cpu().numpy()
+            
+            all_probs.extend(probs)
+            all_labels.extend(labels)
+            
+    # fetch probabilites and target labels
+    probs, targets = np.array(all_probs).flatten(), np.array(all_labels).flatten()
+
+    # Calculate AUC
+    auc_score = roc_auc_score(targets, probs)
+
+    print(f"Test ROC-AUC: {auc_score:.4f}")
+ 
 
 def fetch_best_metrics(history:list) -> None:
     """
