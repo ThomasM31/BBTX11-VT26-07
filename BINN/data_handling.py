@@ -317,6 +317,32 @@ def rollup_to_patient_level(datasets: dict) -> dict:
         
     return patient_level_datasets
 
+def poison_scanner(dataloader: AnnLoader, device) -> None:
+    """
+    Checks for NaN, extreme values
+    """
+    for i, batch in enumerate(dataloader):
+        inputs = batch.X.float().to(device)
+        if type(batch.obs["AD_status"]) is pd.Series:
+            labels = torch.tensor(batch.obs['AD_status'].values.astype(float)).float().reshape(-1, 1).to(device)
+        else:
+            labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
+        # Check for NaNs
+        if torch.isnan(inputs).any():
+            print(f"CRITICAL ERROR: NaN found in inputs at batch {i}!")
+            break
+        
+        # Check for extreme outliers
+        max_val = inputs.max().item()
+        min_val = inputs.min().item()
+        if max_val > 50.0 or min_val < -50.0:
+            print(f"WARNING: Extreme values in batch {i} -> Max: {max_val:.2f}, Min: {min_val:.2f}")
+            
+        # Check for label NaNs
+        if torch.isnan(labels).any():
+            print(f"CRITICAL ERROR: NaN found in labels at batch {i}!")
+            break
+
 def renormalize(datasets:dict) -> dict:
     """
     Renormalize data after summing raw counts per subject
@@ -348,7 +374,7 @@ def create_model(in_features:int, layers_list:list, tensor_masks:list, device, o
                   mask_list=tensor_masks).to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=0)
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=1e-3)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
 
     return model, criterion, optimizer, scheduler
