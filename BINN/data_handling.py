@@ -397,10 +397,9 @@ def training_loop(model: BINN,
         
         #scheduler.step(test_loss)
         
-        print(f"Epoch {epoch+1} / {epochs}")
-        print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
-        print(f"Test Loss:  {test_loss:.4f} | Test Acc:  {test_acc:.4f}")
-        print("-" * 30)
+        print(f"Epoch {epoch:3d} | "
+                f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} || "
+                f"Val Loss: {test_loss:.4f} | Val Acc: {test_acc:.4f}")
 
 # TESTING
 base_path = "/data/shared/alzgene26/data"
