@@ -411,6 +411,20 @@ def training_loop(model: BINN,
     
     return history
 
+def fetch_best_metrics(history:list) -> None:
+    """
+    Best metrics from Training & Testing
+    Args:
+        history(list): list of train losses, train accuracies, test losses, test accuracies over epochs
+    """
+    best_train_acc = sorted(history["train_acc"],reverse=True)[0]
+    best_test_acc = sorted(history["test_acc"],reverse=True)[0]
+    best_train_loss = sorted(history["train_loss"],reverse=True)[0]
+    best_test_loss = sorted(history["test_loss"],reverse=True)[0]
+
+    print(f"Best train Loss: {best_train_loss:.4f} | Best train acc: {best_train_acc:.4f} || "
+                    f"Best test Loss: {best_test_loss:.4f} | Best test acc: {best_test_acc:.4f}")
+
 # TESTING
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
@@ -467,6 +481,9 @@ def pipeline() -> None:
 
     print("Running train/test loop")
     history = training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, EPOCHS)
+
+    print("Fetching metrics...")
+    fetch_best_metrics(history)
 
     print("Pipeline completed!")
 
