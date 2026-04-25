@@ -445,6 +445,8 @@ def evaluate_model_roc(model, test_loader: AnnLoader, device):
     auc_score = roc_auc_score(targets, probs)
 
     print(f"Test ROC-AUC: {auc_score:.4f}")
+
+    return probs, targets
  
 
 def fetch_best_metrics(history:list) -> None:
