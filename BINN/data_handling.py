@@ -365,7 +365,7 @@ def renormalize(datasets:dict) -> dict:
         print(f"Post-scaling Mean: {scaled_mean:.4f} (Should be near 0)")
     return datasets
 
-def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=1e-4):
+def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=1e-4, weight_decay=1e-3):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
     """
@@ -374,7 +374,7 @@ def create_model(in_features:int, layers_list:list, tensor_masks:list, device, o
                   mask_list=tensor_masks).to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=1e-2)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
 
     return model, criterion, optimizer, scheduler
@@ -419,7 +419,7 @@ def fetch_best_metrics(history:list) -> None:
     """
     best_train_acc = sorted(history["train_acc"],reverse=True)[0]
     best_test_acc = sorted(history["test_acc"],reverse=True)[0]
-    
+
     best_train_loss = sorted(history["train_loss"])[0]
     best_test_loss = sorted(history["test_loss"])[0]
 
@@ -448,7 +448,7 @@ def pipeline() -> None:
     in_features, layers_list, tensor_masks = compute_features(masks, device)
 
     print("Creating BINN...")
-    model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=0.001)
+    model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=1e-4, weight_decay=1e-3)
     #model = ShallowMLP(in_features=945, hidden_size=128).to(device)
     #optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=0)
     #criterion = nn.BCEWithLogitsLoss()
