@@ -173,6 +173,105 @@ def pad_align_data(datasets: dict, input_masks: pd.DataFrame) -> dict:
         #print(f"Final shape: {adata_ordered.shape}\n")
     return datasets_padded
 
+def create_global_with_missing_patients(datasets_dict: dict) -> dict:
+    """
+    Concatenates adata to desired shape (427,945) across celltypes
+    Args:
+        datasets_dict: dict of adatas per low res celltype (preprocessed + aligned)
+
+    """    
+    all_subjects = set()
+    for adata in datasets_dict.values():
+        all_subjects.update(adata.obs_names)
+    
+    master_subjects = sorted(list(all_subjects)) 
+    # Let's ensure gene_names are clean strings
+    gene_names = list(datasets_dict[list(datasets_dict.keys())[0]].var_names.astype(str))
+    print(f"  Total unique subjects found: {len(master_subjects)}")
+
+    global_df = pd.DataFrame(0.0, index=master_subjects, columns=gene_names)
+    total_cells_series = pd.Series(0, index=master_subjects)
+
+    for cell_type, adata in datasets_dict.items():
+        # Ensure var_names are strings to match gene_names
+        adata.var_names = adata.var_names.astype(str)
+        
+        current_df = pd.DataFrame(
+            adata.X.toarray() if hasattr(adata.X, 'toarray') else adata.X,
+            index=adata.obs_names,
+            columns=adata.var_names
+        )
+        
+        # SAFE ALIGNMENT: Force both rows AND columns to match exactly
+        current_df_aligned = current_df.reindex(index=master_subjects, columns=gene_names, fill_value=0.0)
+        
+        # SAFE ADDITION: .add() is much safer than += 
+        global_df = global_df.add(current_df_aligned, fill_value=0.0)
+        
+        cell_counts = adata.obs['n_obs_aggregated'].reindex(master_subjects, fill_value=0)
+        total_cells_series = total_cells_series.add(cell_counts, fill_value=0)
+        
+        print(f"  + Added {cell_type} ({len(adata)} subjects)")
+
+    # SAFETY CHECK: Did Pandas introduce NaNs?
+    if global_df.isna().sum().sum() > 0:
+        print("  [!] WARNING: NaNs detected immediately after Pandas aggregation.")
+        global_df = global_df.fillna(0.0)
+
+    global_adata = ad.AnnData(X=csr_matrix(global_df.values))
+    global_adata.obs_names = global_df.index.astype(str)
+    global_adata.var_names = global_df.columns.astype(str)
+
+    # Restore AD_status
+    master_label_map = {}
+    for adata in datasets_dict.values():
+        current_map = adata.obs['AD_status'].to_dict()
+        master_label_map.update(current_map)
+
+    global_adata.obs['subject'] = global_adata.obs_names
+    global_adata.obs['AD_status'] = global_adata.obs_names.map(master_label_map)
+    global_adata.obs['total_cells_all_types'] = total_cells_series.values
+
+    # SAFETY CHECK: The "Dead Patient" Check
+    # If a patient has 0 counts, normalize_total will crash the matrix.
+    row_sums = np.array(global_adata.X.sum(axis=1)).flatten()
+    dead_patients = np.where(row_sums == 0)[0]
+    
+    if len(dead_patients) > 0:
+        print(f"Removing {len(dead_patients)} patients with absolutely ZERO counts to prevent NaN Cascade!")
+        global_adata = global_adata[row_sums > 0].copy()
+
+    # fetch sparse matrix into memory
+    dense_matrix = global_adata.X.toarray() if hasattr(global_adata.X, 'toarray') else global_adata.X
+    
+    # SAFETY CHECK: Negative Values
+    if np.any(dense_matrix < 0):
+         print("CRITICAL WARNING: Negative values found BEFORE log1p! Input datasets already scaled?")
+
+    # Calculate variance
+    variance = np.var(dense_matrix, axis=0)
+    zero_var_genes = np.where(variance == 0)[0]
+
+    # Remove genes with no variance (no information)
+    if len(zero_var_genes) > 0:
+        print(f"  [!] Removing {len(zero_var_genes)} genes with zero variance...")
+        global_adata = global_adata[:, variance > 0].copy()
+
+    # Normalization Pipeline
+    print("Running Scanpy normalization...")
+    sc.pp.normalize_total(global_adata, target_sum=1e4)
+    sc.pp.log1p(global_adata)
+    sc.pp.scale(global_adata, max_value=10)
+
+    # Final verification
+    if np.isnan(global_adata.X).any():
+        print("FAILURE: Matrix still contains NaNs after scaling.")
+    else:
+        print("Matrix is clean.")
+
+    print(f"Done! Final Global shape: {global_adata.shape}")
+    return global_adata
+
 def rollup_to_patient_level(datasets: dict) -> dict:
     """
     Pseudobulk per patient only
@@ -223,10 +322,10 @@ def renormalize(datasets:dict) -> dict:
     Renormalize data after summing raw counts per subject
     """
     for label, adata in datasets.items():
-        # 1. Verification of the matrix range
+        # Verification of the matrix range
         raw_max = adata.X.max()
         
-        # 2. Run the pipeline (Ignore the warning)
+        # Run the pipeline (Ignore the warning)
         sc.pp.normalize_total(adata, target_sum=1e4)
         sc.pp.log1p(adata)
         sc.pp.scale(adata, max_value=10)
@@ -309,18 +408,24 @@ def pipeline() -> None:
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
 
+    print("Rolling up adata to patient level...")
+    patient_datasets = rollup_to_patient_level(datasets)
+
     print("Aligning adatas to BINN...")
-    datasets_aligend = subset_genes(datasets, masks['df0'])
+    datasets_aligend = subset_genes(patient_datasets, masks['df0'])
 
     # TODO: Delete? Should not be needed?
-    #print("Padding adatas to BINN-ready shape...")
-    #datasets_padded = pad_align_data(datasets_aligend, masks["df0"])
+    print("Padding adatas to BINN-ready shape...")
+    datasets_padded = pad_align_data(datasets_aligend, masks["df0"])
 
-    print("Creating AnnCollection...")
-    acollection = ctts.create_encoded_collection(datasets_aligend)
+    print("Starting Global Rollup with missing subject handling...")
+    adata_global = create_global_with_missing_patients(datasets_padded)
+
+    #print("Creating AnnCollection...")
+    #acollection = ctts.create_encoded_collection(datasets_aligend)
 
     print("Creating train/test split...")
-    train_adata, test_adata = ctts.custom_train_test_split(acollection, train_size=TRAIN_SIZE)
+    train_adata, test_adata = ctts.custom_train_test_split(adata_global, train_size=TRAIN_SIZE)
 
     print("Getting dataloaders...")
     train_loader, test_loader = create_dataloaders(train_adata, test_adata)
