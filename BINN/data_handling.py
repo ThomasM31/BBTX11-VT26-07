@@ -419,8 +419,9 @@ def fetch_best_metrics(history:list) -> None:
     """
     best_train_acc = sorted(history["train_acc"],reverse=True)[0]
     best_test_acc = sorted(history["test_acc"],reverse=True)[0]
-    best_train_loss = sorted(history["train_loss"],reverse=True)[0]
-    best_test_loss = sorted(history["test_loss"],reverse=True)[0]
+    
+    best_train_loss = sorted(history["train_loss"])[0]
+    best_test_loss = sorted(history["test_loss"])[0]
 
     print(f"Best train Loss: {best_train_loss:.4f} | Best train acc: {best_train_acc:.4f} || "
                     f"Best test Loss: {best_test_loss:.4f} | Best test acc: {best_test_acc:.4f}")
