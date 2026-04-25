@@ -386,11 +386,13 @@ def training_loop(model: BINN,
                   optimizer, 
                   device, 
                   scheduler, 
-                  epochs:int) -> None:
+                  epochs:int) -> dict:
     """
     Performs the entire training & testing loop over the epochs
     """
-    
+    # Metrics dictionary
+    history = {'train_loss': [], 'train_acc': [], 'test_loss': [], 'test_acc': []}
+
     for epoch in range(epochs):
         train_loss, train_acc = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
         test_loss, test_acc = bt.test_one_epoch(model, test_loader, criterion, device)
@@ -400,6 +402,14 @@ def training_loop(model: BINN,
         print(f"Epoch {epoch:3d} | "
                 f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} || "
                 f"Val Loss: {test_loss:.4f} | Val Acc: {test_acc:.4f}")
+        
+        # Save metrics
+        history['train_loss'].append(train_loss)
+        history['train_acc'].append(train_acc)
+        history['test_loss'].append(test_loss)
+        history['test_acc'].append(test_acc)
+    
+    return history
 
 # TESTING
 base_path = "/data/shared/alzgene26/data"
@@ -456,7 +466,7 @@ def pipeline() -> None:
     train_loader, test_loader = create_dataloaders(train_adata, test_adata)
 
     print("Running train/test loop")
-    training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, EPOCHS)
+    history = training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, EPOCHS)
 
     print("Pipeline completed!")
 
