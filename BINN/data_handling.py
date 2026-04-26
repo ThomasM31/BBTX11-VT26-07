@@ -384,8 +384,8 @@ def create_model(in_features:int,
                  layers_list:list, 
                  tensor_masks:list, 
                  device, 
-                 opt_learning_rate=1e-4, 
-                 weight_decay_opt=1e-4): 
+                 lr=1e-4, 
+                 weight_decay=1e-4): 
                  #dropout_opt=0.3):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
@@ -396,7 +396,7 @@ def create_model(in_features:int,
                   #dropout_p=dropout_opt)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=weight_decay_opt)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
 
     return model, criterion, optimizer, scheduler
@@ -485,6 +485,8 @@ def run_cross_validation(adata,
                         layers_list:list, 
                         tensor_masks:list, 
                         device, 
+                        lr=1e-4,
+                        weight_decay=1e-2,
                         k=5, 
                         epochs=70) -> list:
     """
@@ -517,7 +519,7 @@ def run_cross_validation(adata,
         
         # RE-INITIALIZE MODEL for each fold
         binn, criterion, optimizer, _ = create_model(in_features, layers_list, tensor_masks, device, 
-                                                        opt_learning_rate=1e-4, weight_decay_opt=1e-2)
+                                                        lr=lr, weight_decay=weight_decay)
         
         best_fold_auc = 0
         
