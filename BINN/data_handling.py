@@ -368,13 +368,20 @@ def renormalize(datasets:dict) -> dict:
         print(f"Post-scaling Mean: {scaled_mean:.4f} (Should be near 0)")
     return datasets
 
-def create_model(in_features:int, layers_list:list, tensor_masks:list, device, opt_learning_rate=1e-4, weight_decay_opt=1e-4):
+def create_model(in_features:int, 
+                 layers_list:list, 
+                 tensor_masks:list, 
+                 device, 
+                 opt_learning_rate=1e-4, 
+                 weight_decay_opt=1e-4): 
+                 #dropout_opt=0.3):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
     """
     model = BINN(in_features=in_features,
                   layers_list=layers_list,
                   mask_list=tensor_masks).to(device)
+                  #dropout_p=dropout_opt)
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=opt_learning_rate, weight_decay=weight_decay_opt)
@@ -414,7 +421,7 @@ def training_loop(model: BINN,
     
     return history
 
-def evaluate_model_roc(model, test_loader: AnnLoader, device):
+def evaluate_model_roc(model, test_loader: AnnLoader, device) -> tuple[np.array, np.array]:
     """
     Evaluate model with ROC-AUC
     """
@@ -443,7 +450,6 @@ def evaluate_model_roc(model, test_loader: AnnLoader, device):
 
     # Calculate AUC
     auc_score = roc_auc_score(targets, probs)
-
     print(f"Test ROC-AUC: {auc_score:.4f}")
 
     return probs, targets
@@ -474,58 +480,3 @@ TRAIN_SIZE = 0.8
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
             for i in range(5)]
-
-def pipeline() -> None:
-    print("Fetching device...")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    print("Reading masks...")
-    masks = read_masks(MASK_PATHS)
-
-    print("Computing BINN features...")
-    in_features, layers_list, tensor_masks = compute_features(masks, device)
-
-    print("Creating BINN...")
-    model, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=1e-4, weight_decay=1e-3)
-    #model = ShallowMLP(in_features=945, hidden_size=128).to(device)
-    #optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=0)
-    #criterion = nn.BCEWithLogitsLoss()
-    print(model)
-    scheduler = 0
-
-    print("Reading data into datasets...")
-    datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
-
-    print("Rolling up adata to patient level...")
-    patient_datasets = rollup_to_patient_level(datasets)
-
-    print("Aligning adatas to BINN...")
-    datasets_aligend = subset_genes(patient_datasets, masks['df0'])
-
-    # TODO: Delete? Should not be needed?
-    print("Padding adatas to BINN-ready shape...")
-    datasets_padded = pad_align_data(datasets_aligend, masks["df0"])
-
-    print("Starting Global Rollup with missing subject handling...")
-    adata_global = create_global_with_missing_patients(datasets_padded)
-
-    #print("Creating AnnCollection...")
-    #acollection = ctts.create_encoded_collection(datasets_aligend)
-
-    print("Creating train/test split...")
-    train_adata, test_adata = ctts.custom_train_test_split(adata_global, train_size=TRAIN_SIZE)
-
-    print("Getting dataloaders...")
-    train_loader, test_loader = create_dataloaders(train_adata, test_adata)
-
-    print("Running train/test loop")
-    history = training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, EPOCHS)
-
-    print("Fetching metrics...")
-    fetch_best_metrics(history)
-
-    print("Pipeline completed!")
-
-if __name__ == "__main__":
-    pipeline()
-
