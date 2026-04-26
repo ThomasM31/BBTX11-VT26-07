@@ -9,3 +9,4 @@ torchmetrics
 scikit-learn
 scipy
 shap
+optuna
