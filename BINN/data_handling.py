@@ -1,5 +1,6 @@
 # Own files
 import custom_train_test_split as ctts
+import optuna
 from Binn import BINN
 import binn_training as bt
 
@@ -543,3 +544,36 @@ def run_cross_validation(adata,
     print(f"Mean ROC-AUC: {np.mean(fold_aucs):.4f} +/- {np.std(fold_aucs):.4f}")
     print("="*30)
     return fold_aucs
+
+def hyperparameter_tuning_optuna(adata, in_features, layers_list, tensor_masks, device) -> dict:
+    """
+    Hyperparameter tune the BINN model in regard to learning rate and weight decay
+    """
+    def objective(trial) -> float:
+        # Let Optuna suggest the hyperparameters for this run
+        lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
+        weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-1, log=True)
+        
+        # Run your existing CV function, passing the suggested params
+        fold_aucs = run_cross_validation(adata, in_features, layers_list, tensor_masks, 
+                                            device, k=5, epochs=75, lr=lr, weight_decay=weight_decay)
+        
+        mean_auc = np.mean(fold_aucs)
+        
+        # Optuna will try to MAXIMIZE this returned value
+        return mean_auc
+
+    # Create the study and optimize!
+    print("Starting Optuna Hyperparameter Search...")
+    study = optuna.create_study(direction="maximize")
+
+    # Run 30 trials (takes time, but worth it)
+    study.optimize(objective, n_trials=30)
+
+    # View the results
+    print("\n=== Best Hyperparameters ===")
+    print(study.best_params)
+    print(f"Best Mean CV ROC-AUC: {study.best_value:.4f}")
+
+    return study.best_params
+    # Best recorded: {'lr': 0.0017772099~1.778e-3, 'weight_decay': 0.025921115~2.592e-2}

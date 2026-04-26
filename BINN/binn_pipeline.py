@@ -22,7 +22,6 @@ def pipeline(MASK_PATHS: list[str],
         # Train BINN
         # Test BINN
     - Evaluate + Interpret BINN
-    - Compare to SVM
     """
     print("Starting pipeline...")
 
@@ -36,12 +35,10 @@ def pipeline(MASK_PATHS: list[str],
     in_features, layers_list, tensor_masks = dh.compute_features(masks, device)
 
     print("Creating BINN...")
-    model, criterion, optimizer, scheduler = dh.create_model(in_features, layers_list, tensor_masks, device, opt_learning_rate=1e-4, weight_decay=1e-3)
-    #model = ShallowMLP(in_features=945, hidden_size=128).to(device)
-    #optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=0)
-    #criterion = nn.BCEWithLogitsLoss()
+    model, criterion, optimizer, scheduler = dh.create_model(in_features, layers_list, tensor_masks, 
+                                                             device, lr=1.778e-3, weight_decay=2.592e-2)
+    print("Showing model...")
     print(model)
-    scheduler = 0
 
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=to_include, filepath=data_path)
