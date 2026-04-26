@@ -14,7 +14,8 @@ import anndata as ad
 from anndata.experimental import AnnCollection
 
 # Own files
-from BINN import custom_train_test_split as ctts
+import BINN.custom_train_test_split as ctts
+
 def read_adata(indices: list, train_size=0.8):
     train_adata, test_adata, collection = ctts.pipeline(indices, data_path, train_size)
     return train_adata, test_adata, collection
@@ -49,7 +50,7 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     y_scores = clf_svm.predict_proba(X_test_pca)[:, 1]
 
     # ROC AUC 
-    fpr, tpr, _ = roc_curve(y_test, y_scores)
+    #fpr, tpr, _ = roc_curve(y_test, y_scores)
     auc = roc_auc_score(y_test, y_scores)
     print(f"AUC: {auc:.4f}")
 
@@ -86,22 +87,27 @@ TRAIN_SIZE = 0.8
 # Pipeline -------------------------------------------------------------------
 print("Reading processed adata...")
 #train_adata, test_adata, acollection = read_adata([0], train_size=0.8)
-#datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
-datasets = ctts.read_files(to_include=[8], filepath=data_path)
+datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
+#datasets = ctts.read_files(to_include=[8], filepath=data_path)
 print("Dataset rollup...")
 patient_datasets = dh.rollup_to_patient_level(datasets)
-print("Renormalizing data...")
-datasets_norm = dh.renormalize(patient_datasets)
+#print("Renormalizing data...")
+#datasets_norm = dh.renormalize(patient_datasets)
 print("Reading masks...")
 masks = dh.read_masks(MASK_PATHS, print_shapes=True)
 print("Aligning adatas to BINN...")
-datasets_aligend = dh.subset_genes(datasets_norm, masks['df0'])
+datasets_aligend = dh.subset_genes(patient_datasets, masks['df0'])
 print("Padding adatas to BINN-ready shape...")
 datasets_padded = dh.pad_align_data(datasets_aligend, masks["df0"])
-print("Creating AnnCollection...")
-acollection = ctts.create_encoded_collection(datasets_padded)
+
+print("Starting Global Rollup with missing subject handling...")
+adata_global = dh.create_global_with_missing_patients(datasets_padded)
+
+#print("Creating AnnCollection...")
+#acollection = ctts.create_encoded_collection(datasets_padded)
+
 print("Creating train/test split...")
-train_adata, test_adata = ctts.custom_train_test_split(acollection, train_size=TRAIN_SIZE)
+train_adata, test_adata = ctts.custom_train_test_split(adata_global, train_size=TRAIN_SIZE)
 print("Running baseline model...")
 baseline_model(train_adata, test_adata)
 # -------------------------------------------------------------------
