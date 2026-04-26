@@ -2,7 +2,6 @@
 import custom_train_test_split as ctts
 from Binn import BINN
 import binn_training as bt
-#from BINN.regNN import ShallowMLP
 
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
@@ -13,6 +12,19 @@ from scipy.sparse import csr_matrix
 import torch.nn as nn
 import torch
 import scanpy as sc
+from sklearn.model_selection import StratifiedKFold
+
+# TESTING
+base_path = "/data/shared/alzgene26/data"
+data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
+
+# GLOBALS
+EPOCHS = 40
+TRAIN_SIZE = 0.8
+ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
+MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+            for i in range(5)]
+
 
 def data_concatenate(acollection : AnnCollection):
     """
@@ -450,10 +462,8 @@ def evaluate_model_roc(model, test_loader: AnnLoader, device) -> tuple[np.array,
 
     # Calculate AUC
     auc_score = roc_auc_score(targets, probs)
-    print(f"Test ROC-AUC: {auc_score:.4f}")
 
-    return probs, targets
- 
+    return probs, targets, auc_score
 
 def fetch_best_metrics(history:list) -> None:
     """
@@ -470,13 +480,64 @@ def fetch_best_metrics(history:list) -> None:
     print(f"Best train Loss: {best_train_loss:.4f} | Best train acc: {best_train_acc:.4f} || "
                     f"Best test Loss: {best_test_loss:.4f} | Best test acc: {best_test_acc:.4f}")
 
-# TESTING
-base_path = "/data/shared/alzgene26/data"
-data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
+def run_cross_validation(adata, 
+                        in_features:int, 
+                        layers_list:list, 
+                        tensor_masks:list, 
+                        device, 
+                        k=5, 
+                        epochs=70) -> list:
+    """
+    Cross validate BINN
+    Args:
+        adata(ad.Anndata): global concatenated anndata
+        k(int): number of cross-val splits
+        epochs(int): 
 
-# GLOBALS
-EPOCHS = 40
-TRAIN_SIZE = 0.8
-ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
-            for i in range(5)]
+    Returns:
+        AUC scores for each fold
+    """
+    # Prepare indices and labels
+    X_indices = np.arange(adata.n_obs)
+    y_labels = adata.obs['AD_status'].values.astype(float)
+    
+    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+    fold_aucs = []
+
+    for fold, (train_idx, val_idx) in enumerate(skf.split(X_indices, y_labels)):
+        print(f"\n--- Starting Fold {fold+1}/{k} ---")
+        
+        # Create subsets
+        train_sub = adata[train_idx].copy()
+        val_sub = adata[val_idx].copy()
+        
+        # Initialize fresh loaders
+        train_loader = AnnLoader(train_sub, batch_size=32, shuffle=True)
+        val_loader = AnnLoader(val_sub, batch_size=32, shuffle=False)
+        
+        # RE-INITIALIZE MODEL for each fold
+        binn, criterion, optimizer, _ = create_model(in_features, layers_list, tensor_masks, device, 
+                                                        opt_learning_rate=1e-4, weight_decay_opt=1e-2)
+        
+        best_fold_auc = 0
+        
+        # Training Loop for this fold
+        for epoch in range(epochs):
+            train_loss, train_acc = bt.train_one_epoch(binn, train_loader, criterion, optimizer, device)
+            #test_loss, test_acc = bt.test_one_epoch(binn, val_loader, criterion, device)
+
+            # Evaluate AUC at end of epoch
+            probs, targets, auc_score = evaluate_model_roc(binn, val_loader, device)
+            current_auc = roc_auc_score(targets, probs)
+            
+            if current_auc > best_fold_auc:
+                best_fold_auc = current_auc
+        
+        print(f"Fold {fold+1} Best Test AUC: {best_fold_auc:.4f}")
+        fold_aucs.append(best_fold_auc)
+
+    # Final Results
+    print("\n" + "="*30)
+    print(f"Mean ROC-AUC: {np.mean(fold_aucs):.4f} +/- {np.std(fold_aucs):.4f}")
+    print("="*30)
+    return fold_aucs
