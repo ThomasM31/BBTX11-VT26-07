@@ -397,8 +397,8 @@ def create_model(in_features:int,
                   #dropout_p=dropout_opt)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=75, eta_min=1e-6)
 
     return model, criterion, optimizer, scheduler
 
@@ -420,7 +420,7 @@ def training_loop(model: BINN,
         train_loss, train_acc = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
         test_loss, test_acc = bt.test_one_epoch(model, test_loader, criterion, device)
         
-        #scheduler.step(test_loss)
+        scheduler.step() #test_loss som argument?
         
         print(f"Epoch {epoch:3d} | "
                 f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} || "
@@ -434,6 +434,19 @@ def training_loop(model: BINN,
     
     return history
 
+def dead_output_check(model: BINN, mask_matrix_list: list) -> None:
+    """
+    Check the mask matrix list for dead outputs in all layers
+    """
+    for i in range(len(mask_matrix_list)):
+        mask = getattr(model, f'mask_{i}')
+        # Check for rows (output neurons) with no active inputs
+        dead_outputs = (mask.sum(dim=1 if mask.shape[1] > mask.shape[0] else 0) == 0).sum()
+        if dead_outputs > 0:
+            print(f"Layer {i} has {dead_outputs} dead nodes with zero biological connections!")
+        else:
+            print(f"Layer {i} has no dead outputs")
+    
 def evaluate_model_roc(model, test_loader: AnnLoader, device) -> tuple[np.array, np.array]:
     """
     Evaluate model with ROC-AUC
