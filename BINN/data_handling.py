@@ -131,6 +131,19 @@ def compute_features(masks:dict, device) -> tuple[list, int, list, list]:
 
     return mask_matrix_list, in_features, layers_list, tensor_masks
 
+
+def inf_check(adata: ad.AnnData) -> None:
+    """
+    Check input anndata for NaNs and inf. values
+    """
+    # Check for NaNs in the matrix
+    has_nan = np.isnan(adata.X).any()
+    print(f"Are there NaNs in the data? {has_nan}")
+
+    # Check for Infinite values
+    has_inf = np.isinf(adata.X).any()
+    print(f"Are there Infs in the data? {has_inf}")
+
 def subset_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
     """
     Subsets the adatas to only include genes present in BINN.
