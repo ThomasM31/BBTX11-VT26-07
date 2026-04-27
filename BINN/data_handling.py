@@ -99,10 +99,12 @@ def read_masks(mask_paths, print_shapes=False) -> dict:
             print(f"Matrix {i} shape: {df.shape}")
     return mask_dict
 
-def compute_features(masks:dict, device) -> tuple[int, list, list]:
+def compute_features(masks:dict, device) -> tuple[list, int, list, list]:
     """
     Extract biological layer information for the BINN. 
-    Args:
+    Returns:
+        mask_matrix_list(list): List of mask matrices in order
+
         in_features(integer): Number of input featues (e.g. number of relevant genes).
 
         layer_list(list of integers): A list defining the number of neurons in each
@@ -127,7 +129,7 @@ def compute_features(masks:dict, device) -> tuple[int, list, list]:
     print(f"input features: {in_features}")
     print(f"layer list: {layers_list}")
 
-    return in_features, layers_list, tensor_masks
+    return mask_matrix_list, in_features, layers_list, tensor_masks
 
 def subset_genes(datasets: dict, input_masks: pd.DataFrame) -> dict:
     """
