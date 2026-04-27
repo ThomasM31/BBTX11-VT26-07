@@ -504,16 +504,16 @@ def fetch_best_metrics(history:list) -> tuple[float,float,float,float]:
     best_train_acc_i = np.argmax(history["train_acc"])
 
     best_test_acc = max(history["test_acc"])
-    best_test_acc_i = np.argmax(history["train_acc"])
+    best_test_acc_i = np.argmax(history["test_acc"])
 
     best_train_loss = min(history["train_loss"]) 
-    best_train_loss_i = np.argmin(history["train_acc"])
+    best_train_loss_i = np.argmin(history["train_loss"])
 
     best_test_loss = min(history["test_loss"]) 
-    best_test_loss_i = np.argmin(history["train_acc"])
+    best_test_loss_i = np.argmin(history["test_loss"])
 
-    print(f"Best train Loss: {best_train_loss:.4f} | Best train acc: {best_train_acc:.4f} || "
-                    f"Best test Loss: {best_test_loss:.4f} | Best test acc: {best_test_acc:.4f}")
+    print(f"Best train Loss: {best_train_loss:.4f} found at epoch {best_train_loss_i} | Best train acc: {best_train_acc:.4f} found at epoch {best_train_acc_i} || "
+                f"Best test Loss: {best_test_loss:.4f} found at epoch {best_test_loss_i} | Best test acc: {best_test_acc:.4f} found at epoch {best_test_acc_i}")
     
     return best_train_acc_i, best_test_acc_i, best_train_loss_i, best_test_loss_i
 
