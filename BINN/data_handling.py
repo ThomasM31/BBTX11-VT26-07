@@ -131,7 +131,6 @@ def compute_features(masks:dict, device) -> tuple[list, int, list, list]:
 
     return mask_matrix_list, in_features, layers_list, tensor_masks
 
-
 def inf_check(adata: ad.AnnData) -> None:
     """
     Check input anndata for NaNs and inf. values
@@ -400,8 +399,8 @@ def create_model(in_features:int,
                  layers_list:list, 
                  tensor_masks:list, 
                  device, 
-                 lr=1e-4, 
-                 weight_decay=1e-4): 
+                 lr, 
+                 weight_decay): 
                  #dropout_opt=0.3):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
@@ -439,7 +438,7 @@ def training_loop(model: BINN,
         
         print(f"Epoch {epoch:3d} | "
                 f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} || "
-                f"Val Loss: {test_loss:.4f} | Val Acc: {test_acc:.4f}")
+                f"Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.4f}")
         
         # Save metrics
         history['train_loss'].append(train_loss)
