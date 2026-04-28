@@ -525,12 +525,13 @@ def run_cross_validation(adata,
                         layers_list:list, 
                         tensor_masks:list, 
                         device, 
-                        lr=1e-4,
-                        weight_decay=1e-2,
+                        lr=4e-3,
+                        weight_decay=0.123,
+                        batch_size=32,
                         dropout=0.5,
-                        activation_fn=nn.LeakyReLU(0.1),
+                        activation_fn=nn.Tanh(),
                         k=5, 
-                        epochs=70) -> list:
+                        epochs=150) -> list:
     """
     Cross validate BINN
     Args:
@@ -556,12 +557,12 @@ def run_cross_validation(adata,
         val_sub = adata[val_idx].copy()
         
         # Initialize fresh loaders
-        train_loader = AnnLoader(train_sub, batch_size=32, shuffle=True)
-        val_loader = AnnLoader(val_sub, batch_size=32, shuffle=False)
+        train_loader = AnnLoader(train_sub, batch_size=batch_size, shuffle=True)
+        val_loader = AnnLoader(val_sub, batch_size=batch_size, shuffle=False)
         
         # RE-INITIALIZE MODEL for each fold
         binn, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, 
-                                                        lr=lr, weight_decay=weight_decay, dropout=0.5, activation_fn=activation_fn)
+                                                        lr=lr, weight_decay=weight_decay, dropout=dropout, activation_fn=activation_fn)
         
         best_fold_auc = 0
         
@@ -586,7 +587,15 @@ def run_cross_validation(adata,
     print("="*30)
     return fold_aucs
 
-def hyperparameter_tuning_optuna(adata, in_features, layers_list, tensor_masks, device) -> dict:
+def hyperparameter_tuning_optuna(adata, 
+                                in_features:int, 
+                                layers_list:list, 
+                                tensor_masks:list, 
+                                device, 
+                                batch_size=32,
+                                activation_fn=nn.Tanh(),
+                                k=5, 
+                                epochs=150) -> dict:
     """
     Hyperparameter tune the BINN model in regard to learning rate and weight decay
     """
@@ -594,10 +603,12 @@ def hyperparameter_tuning_optuna(adata, in_features, layers_list, tensor_masks, 
         # Let Optuna suggest the hyperparameters for this run
         lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
         weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-1, log=True)
+        dropout = trial.suggest_float("dropout", 0.1, 0.5, log=True)
         
         # Run your existing CV function, passing the suggested params
         fold_aucs = run_cross_validation(adata, in_features, layers_list, tensor_masks, 
-                                            device, k=5, epochs=75, lr=lr, weight_decay=weight_decay)
+                                            device, k=k, epochs=epochs, lr=lr, weight_decay=weight_decay, 
+                                            batch_size=batch_size, dropout=dropout, activation_fn=activation_fn)
         
         mean_auc = np.mean(fold_aucs)
         
