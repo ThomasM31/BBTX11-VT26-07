@@ -402,7 +402,7 @@ def create_model(in_features:int,
                  lr:float, 
                  weight_decay:float,
                  dropout:float,
-                 activation_func=nn.LeakyReLU(0.1)):
+                 activation_fn=nn.LeakyReLU(0.1)):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
     """
@@ -410,8 +410,7 @@ def create_model(in_features:int,
                   layers_list=layers_list,
                   mask_list=tensor_masks,
                   dropout=dropout,
-                  activation=activation_func).to(device)
-                  #dropout_p=dropout_opt)
+                  activation_fn=activation_fn).to(device)
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)

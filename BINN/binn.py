@@ -20,7 +20,7 @@ class BINN(nn.Module):
                  layers_list: list, 
                  mask_list: list,
                  activation_fn = nn.LeakyReLU(0.1), 
-                 dropout_p: float = 0.5):
+                 dropout: float = 0.5):
         super(BINN, self).__init__()
 
         self.in_features = in_features
@@ -28,7 +28,7 @@ class BINN(nn.Module):
         self.mask_list = mask_list
         self.n_masks = len(mask_list)
         self.activation_fn = activation_fn
-        self.dropout = nn.Dropout(p=dropout_p)
+        self.dropout = nn.Dropout(p=dropout)
         
         # Move masks to the same device as the model and store them in a list
         for i, m in enumerate(mask_list):
@@ -36,7 +36,6 @@ class BINN(nn.Module):
 
         # Create the linear layers & batch normalizations dynamically
         self.model_layers = nn.ModuleList()
-        # Add LayerNorms (TODO: TEST)
         self.layer_norms = nn.ModuleList()
 
         current_in_features = in_features
