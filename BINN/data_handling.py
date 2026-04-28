@@ -399,15 +399,18 @@ def create_model(in_features:int,
                  layers_list:list, 
                  tensor_masks:list, 
                  device, 
-                 lr, 
-                 weight_decay): 
-                 #dropout_opt=0.3):
+                 lr:float, 
+                 weight_decay:float,
+                 dropout:float,
+                 activation_func=nn.LeakyReLU(0.1)):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
     """
     model = BINN(in_features=in_features,
                   layers_list=layers_list,
-                  mask_list=tensor_masks).to(device)
+                  mask_list=tensor_masks,
+                  dropout=dropout,
+                  activation=activation_func).to(device)
                   #dropout_p=dropout_opt)
 
     criterion = nn.BCEWithLogitsLoss()
