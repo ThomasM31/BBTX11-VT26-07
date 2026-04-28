@@ -411,6 +411,7 @@ def create_model(in_features:int,
                   mask_list=tensor_masks,
                   dropout=dropout,
                   activation_fn=activation_fn).to(device)
+                  #dropout_p=dropout_opt)
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -526,6 +527,8 @@ def run_cross_validation(adata,
                         device, 
                         lr=1e-4,
                         weight_decay=1e-2,
+                        dropout=0.5,
+                        activation_fn=nn.LeakyReLU(0.1),
                         k=5, 
                         epochs=70) -> list:
     """
@@ -557,8 +560,8 @@ def run_cross_validation(adata,
         val_loader = AnnLoader(val_sub, batch_size=32, shuffle=False)
         
         # RE-INITIALIZE MODEL for each fold
-        binn, criterion, optimizer, _ = create_model(in_features, layers_list, tensor_masks, device, 
-                                                        lr=lr, weight_decay=weight_decay)
+        binn, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, 
+                                                        lr=lr, weight_decay=weight_decay, dropout=0.5, activation_fn=activation_fn)
         
         best_fold_auc = 0
         
