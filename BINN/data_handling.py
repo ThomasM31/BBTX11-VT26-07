@@ -69,7 +69,7 @@ def transpose_datasets(datasets:dict) -> dict:
 
 def create_dataloaders(train_adata: ad.AnnData,
                        test_adata: ad.AnnData,
-                       batch_size=16) -> tuple[AnnLoader, AnnLoader]:
+                       batch_size: int) -> tuple[AnnLoader, AnnLoader]:
     """
     Create dataloaders using built in loader for AnnData
     """
@@ -612,4 +612,3 @@ def hyperparameter_tuning_optuna(adata, in_features, layers_list, tensor_masks, 
     print(f"Best Mean CV ROC-AUC: {study.best_value:.4f}")
 
     return study.best_params
-    # Best recorded: {'lr': 0.0017772099~1.778e-3, 'weight_decay': 0.025921115~2.592e-2}
