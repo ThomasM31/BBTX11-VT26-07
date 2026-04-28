@@ -4,13 +4,23 @@ from Binn import BINN
 import binn_training as bt, data_handling as dh, custom_train_test_split as ctts
 import torch
 
-def pipeline(MASK_PATHS: list[str],
-            TRAIN_SIZE: float,
-            EPOCHS: int,
-            to_include: list, 
-            data_path: str,
-            in_features: int,
-            layers_list: list
+# GLOBALS
+EPOCHS = 40
+TRAIN_SIZE = 0.8
+ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
+MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+            for i in range(5)]
+base_path = "/data/shared/alzgene26/data"
+data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
+
+
+def pipeline(#MASK_PATHS: list[str],
+            #TRAIN_SIZE: float,
+            #EPOCHS: int,
+            #to_include: list, 
+            #data_path: str,
+            #in_features: int,
+            #layers_list: list
             ) -> None:
     """
     TODO: UPDATE !!!
@@ -32,16 +42,17 @@ def pipeline(MASK_PATHS: list[str],
     masks = dh.read_masks(MASK_PATHS)
 
     print("Computing BINN features...")
-    in_features, layers_list, tensor_masks = dh.compute_features(masks, device)
+    mask_matrix_list, in_features, layers_list, tensor_masks = dh.compute_features(masks, device)
 
     print("Creating BINN...")
     model, criterion, optimizer, scheduler = dh.create_model(in_features, layers_list, tensor_masks, 
                                                              device, lr=1.778e-3, weight_decay=2.592e-2)
-    print("Showing model...")
+
+    print("Showing BINN...")
     print(model)
 
     print("Reading data into datasets...")
-    datasets = ctts.read_files(to_include=to_include, filepath=data_path)
+    datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
 
     print("Rolling up adata to patient level...")
     patient_datasets = dh.rollup_to_patient_level(datasets)
@@ -81,11 +92,12 @@ if __name__ == "__main__":
     )
 
     # Positional argument: accepts one or more integers
-    parser.add_argument(
-        "to_include",
-        type=int,        
-        nargs='+',       
-        help="indices to include: \n0=astro \n1=exc1 \n2=exc2 \n3=exc3 \n4=immune \n5=inhi \n6=oligo \n7=opcs \n8=vasc",
-    )
+    #parser.add_argument(
+    #    "to_include",
+    #    type=int,        
+    #    nargs='+',       
+    #    help="indices to include: \n0=astro \n1=exc1 \n2=exc2 \n3=exc3 \n4=immune \n5=inhi \n6=oligo \n7=opcs \n8=vasc",
+    #)
 
     pipeline()
+
