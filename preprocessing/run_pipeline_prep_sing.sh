@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --array=8
+#SBATCH --array=[0-8]
 
 # --- LOGGING SETUP ---
 # %A = Master Job ID | %a = Array Index ID

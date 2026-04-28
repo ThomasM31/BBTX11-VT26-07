@@ -3,6 +3,7 @@ import argparse
 import os
 from pathlib import Path
 import pipeline_paths as ppaths
+import pandas as pd
 
 '''
 FIRST PIPELINE TO PREPARE DATA FOR PREPROCESSING.
@@ -10,12 +11,8 @@ DOES TASKS THAT CAN BE DONE FOR EACH DATASET SEPARATELY (RUN 1 AT A TIME).
 '''
 
 def pipeline(
-        to_include: int, 
-        n_top_genes: int, 
-        min_genes: int, 
-        min_cells:int,
-        nr_common_hvgs:int,
-        common_hvg_inc_value:int,
+        to_include: int,
+        train_size: float,
         shared_dir_mode: bool
         ) -> None:
     
@@ -34,25 +31,49 @@ def pipeline(
 
     #-------FILTERING PREP FOR PER GENE FILTERING-------
     for label, adata in datasets.items():
-        f = pp.gene_expr_count_path / f'{label}.csv'
         # writes gene expression count per dataset to .csv
-        d = {label:adata}
-        pre.write_gene_expr_count(d, pp.gene_expr_count_path)     
+        #pre.write_gene_expr_count({label:adata}, pp.gene_expr_count_path)     
+        pass
 
     # save genes that exist in reactome to file
     source_file = 'ReactomePathways.gmt'
     save_file = 'reactome_genes.txt'
     pre.save_reactome_genes(pp.pathway_data_path, source_file, save_file)
     
+    # do train-test split (for HVG selection)
+    print('Selecting training subjects.')
+    path = pp.metadata_path / 'individual_metadata_deidentified.tsv'
+    metadata = pd.read_csv(path, sep='\t')
+    md_sel = metadata[['subject']]
+    # use the same random state for all cell types so we get same subjects for all
+    sample = md_sel.sample(frac=train_size, random_state=92)
+
+    # keep track of which subjects are to be used as train subjects
+    train_subjects_save_path = pp.metadata_path / 'train_subjects.tsv'
+    print(f'Writing {sample.size} train subjects to {train_subjects_save_path}')
+    sample.to_csv(train_subjects_save_path)
+    
     # make one .txt file for each cell type with 
-    # genes sorted from most to least variable
+    # genes sorted from most to least variable 
+    # (only computed for train subjects to avoid data leakage)
     # this method does not require normalized data
+    print('Ordering genes by variability')
     for label, adata in datasets.items():
-        f = pp.hvg_lists_path / f'{label}.txt'
-        d = {label:adata}
-        pre.extract_hvgs_full_list(d, pp.hvg_lists_path)
+        train_adata = adata[adata.obs['subject'].isin(sample['subject'])].copy()
+        pre.extract_hvgs_full_list({label:train_adata}, pp.hvg_lists_path)
     
     print('Pipeline completed')
+
+def range_limited_float_type(arg):
+    MIN_VAL = 0.0
+    MAX_VAL = 1.0
+    try:
+        f = float(arg)
+    except ValueError:    
+        raise argparse.ArgumentTypeError(f"Must be a float")
+    if f < MIN_VAL or f > MAX_VAL:
+        raise argparse.ArgumentTypeError(f"Argument must be in [{MIN_VAL},{MAX_VAL}]")
+    return f
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -66,52 +87,11 @@ if __name__ == "__main__":
         help="indices to include: \n0=astro \n1=exc1 \n2=exc2 \n3=exc3 \n4=immune \n5=inhi \n6=oligo \n7=opcs \n8=vasc",
     )
 
-    # Optional argument n_top_genes
     parser.add_argument(
-        "--n_top_genes", 
-        type=int,
-        default=2000,
-        help="Number of highly variable genes to keep (default: 2000)"
-    )
-
-    # Optional argument
-    parser.add_argument(
-        "--gene_in_min_cells", 
-        type=int,
-        default=200,
-        help="Filter out genes that are expressed in less than n cells."
-    )
-
-    # Optional argument
-    parser.add_argument(
-        "--cell_with_min_genes", 
-        type=int,
-        default=200,
-        help="Filter out cells that have less than n gene expressions."
-    )
-
-    # Optional argument
-    parser.add_argument(
-        "--nr_common_hvgs", 
-        type=int,
-        default=1000,
-        help="Target for minimum nr of common hvgs"
-    )
-
-    # Optional argument
-    parser.add_argument(
-        "--common_hvg_inc_value", 
-        type=int,
-        default=3000,
-        help="Amount to increment n_top_genes if nr common genes is under target."
-    )
-
-    # Optional argument
-    parser.add_argument(
-        "--draw_umaps", 
-        type=bool,
-        default=False,
-        help="Visualize cell sparation. Defualt is False"
+        "--train_size",
+        help="float with min:0.0, max:1.0, default=0.8",
+        type=range_limited_float_type,
+        default=0.8
     )
 
     # Optional argument
@@ -125,19 +105,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     to_include = args.to_include
-    n_top = args.n_top_genes
-    min_cells = args.gene_in_min_cells
-    min_genes = args.cell_with_min_genes
-    nr_common_hvgs = args.nr_common_hvgs
-    common_hvg_inc_value = args.common_hvg_inc_value
+    train_size = args.train_size
     shared_dir_mode = args.shared_dir_mode
 
     pipeline(
         to_include, 
-        n_top_genes=n_top, 
-        min_genes=min_genes, 
-        min_cells=min_cells, 
-        nr_common_hvgs=nr_common_hvgs, 
-        common_hvg_inc_value=common_hvg_inc_value, 
+        train_size=train_size,
         shared_dir_mode = shared_dir_mode
         )
