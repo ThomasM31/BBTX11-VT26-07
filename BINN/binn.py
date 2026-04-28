@@ -19,7 +19,7 @@ class BINN(nn.Module):
                  in_features: int, 
                  layers_list: list, 
                  mask_list: list,
-                 activation_fn = nn.LeakyReLU(0.1), 
+                 activation_fn = nn.Tanh(), 
                  dropout: float = 0.5):
         super(BINN, self).__init__()
 

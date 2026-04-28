@@ -3,6 +3,7 @@ import os
 from binn import BINN
 import binn_training as bt, data_handling as dh, custom_train_test_split as ctts
 import torch
+import torch.nn as nn
 
 # GLOBALS
 EPOCHS = 200
@@ -12,7 +13,10 @@ MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipelin
             for i in range(5)]
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
-
+LR = 4e-3
+WEIGHT_DECAY = 0.123
+DROPOUT = 0.5
+ACTIVATION_FN = nn.Tanh()
 
 def pipeline(#MASK_PATHS: list[str],
             #TRAIN_SIZE: float,
@@ -46,7 +50,8 @@ def pipeline(#MASK_PATHS: list[str],
 
     print("Creating BINN...")
     model, criterion, optimizer, scheduler = dh.create_model(in_features, layers_list, tensor_masks, 
-                                                             device, lr=4e-3, weight_decay=0.123)
+                                                             device, lr=LR, weight_decay=WEIGHT_DECAY, 
+                                                             dropout=DROPOUT, activation_fn=ACTIVATION_FN)
 
     print("Showing BINN...")
     print(model)
