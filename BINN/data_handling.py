@@ -1,7 +1,7 @@
 # Own files
 import custom_train_test_split as ctts
 import optuna
-from Binn import BINN
+from binn import BINN
 import binn_training as bt
 
 import anndata as ad

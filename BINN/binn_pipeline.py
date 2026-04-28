@@ -1,6 +1,6 @@
 import argparse
 import os
-from Binn import BINN
+from binn import BINN
 import binn_training as bt, data_handling as dh, custom_train_test_split as ctts
 import torch
 
