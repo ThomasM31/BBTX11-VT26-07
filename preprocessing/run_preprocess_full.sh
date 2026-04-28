@@ -36,7 +36,7 @@ export PYTHONUNBUFFERED=1
 
 # Run the Python script
 # We use 'time' to see how long the Python process actually took
-time python3 -u pipeline_preprocess.py $SLURM_ARRAY_TASK_ID
+time python3 -u pipeline_preprocess_full.py $SLURM_ARRAY_TASK_ID
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?
