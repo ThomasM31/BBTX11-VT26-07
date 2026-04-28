@@ -5,7 +5,7 @@ import binn_training as bt, data_handling as dh, custom_train_test_split as ctts
 import torch
 
 # GLOBALS
-EPOCHS = 40
+EPOCHS = 200
 TRAIN_SIZE = 0.8
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
