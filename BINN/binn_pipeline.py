@@ -46,7 +46,7 @@ def pipeline(#MASK_PATHS: list[str],
 
     print("Creating BINN...")
     model, criterion, optimizer, scheduler = dh.create_model(in_features, layers_list, tensor_masks, 
-                                                             device, lr=1.778e-3, weight_decay=2.592e-2)
+                                                             device, lr=4e-3, weight_decay=0.123)
 
     print("Showing BINN...")
     print(model)
