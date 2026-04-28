@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import argparse
+import sys
 
 import scanpy as sc
 import pandas as pd
@@ -107,6 +108,21 @@ def custom_train_test_split(collection: AnnCollection | ad.AnnData,
 
     return train_adata, test_adata
 
+
+def predefined_subject_train_test_split(collection: AnnCollection | ad.AnnData, 
+                            train_subjects_df: pd.DataFrame) -> tuple[ad.AnnData, ad.AnnData]:
+    '''
+    Split AnnCollection into train and test sets based on DataFrame with train subjects
+    '''
+    is_train = collection.obs['subject'].isin(train_subjects_df['subject'])
+    train_adata = collection[is_train, :].copy()
+    test_adata = collection[~is_train, :].copy()
+    
+    # Verify the results
+    print(f"Train Subjects: {train_adata.obs['subject'].nunique()}")
+    print(f"Test Subjects: {test_adata.obs['subject'].nunique()}")
+
+    return train_adata, test_adata
 
 def pipeline(to_include: list[int], filepath: str, train_size: float):
     '''Prepare train-test split from preprocessed .h5ad files'''
