@@ -50,10 +50,10 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     y_scores = clf_svm.predict_proba(X_test_pca)[:, 1]
 
     # ROC AUC 
-    #fpr, tpr, _ = roc_curve(y_test, y_scores)
+    fpr, tpr, _ = roc_curve(y_test, y_scores, pos_label=1)
     auc = roc_auc_score(y_test, y_scores)
     print(f"AUC: {auc:.4f}")
-
+    
     """
     # Plot & save ROC-curve
     plt.figure()
@@ -65,6 +65,7 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     plt.legend()
     plt.savefig("/data/users/thomath/kand/curves_graphs/SVM astro roc_curve.png")
     """
+    
     # CV
     print("Cross validating now!")
     scores = cross_val_score(clf_svm, X_train, y_train, cv=5, scoring='roc_auc')
@@ -86,26 +87,18 @@ TRAIN_SIZE = 0.8
 
 # Pipeline -------------------------------------------------------------------
 print("Reading processed adata...")
-#train_adata, test_adata, acollection = read_adata([0], train_size=0.8)
 datasets = ctts.read_files(to_include=ALL_CELLTYPES, filepath=data_path)
 #datasets = ctts.read_files(to_include=[8], filepath=data_path)
 print("Dataset rollup...")
 patient_datasets = dh.rollup_to_patient_level(datasets)
-#print("Renormalizing data...")
-#datasets_norm = dh.renormalize(patient_datasets)
 print("Reading masks...")
 masks = dh.read_masks(MASK_PATHS, print_shapes=True)
 print("Aligning adatas to BINN...")
 datasets_aligend = dh.subset_genes(patient_datasets, masks['df0'])
 print("Padding adatas to BINN-ready shape...")
 datasets_padded = dh.pad_align_data(datasets_aligend, masks["df0"])
-
 print("Starting Global Rollup with missing subject handling...")
 adata_global = dh.create_global_with_missing_patients(datasets_padded)
-
-#print("Creating AnnCollection...")
-#acollection = ctts.create_encoded_collection(datasets_padded)
-
 print("Creating train/test split...")
 train_adata, test_adata = ctts.custom_train_test_split(adata_global, train_size=TRAIN_SIZE)
 print("Running baseline model...")
