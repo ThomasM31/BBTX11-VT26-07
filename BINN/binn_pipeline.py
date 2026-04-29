@@ -1,7 +1,9 @@
 import argparse
 import os
 from binn import BINN
-import binn_training as bt, data_handling as dh, custom_train_test_split as ctts
+import binn_training as bt
+import data_handling as dh
+import custom_train_test_split as ctts
 import torch
 import torch.nn as nn
 
@@ -13,9 +15,9 @@ MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipelin
             for i in range(5)]
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
-LR = 4e-3
-WEIGHT_DECAY = 0.123
-DROPOUT = 0.5
+LR = 9.76e-3
+WEIGHT_DECAY = 9.96e-2
+DROPOUT = 1.699e-1
 ACTIVATION_FN = nn.Tanh()
 
 def pipeline(#MASK_PATHS: list[str],
