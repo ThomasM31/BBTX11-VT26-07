@@ -236,7 +236,7 @@ def create_global_with_missing_patients(datasets_dict: dict) -> dict:
         # SAFE ADDITION: .add() is much safer than += 
         global_df = global_df.add(current_df_aligned, fill_value=0.0)
         
-        cell_counts = adata.obs['n_obs_aggregated'].reindex(master_subjects, fill_value=0)
+        cell_counts = adata.obs['n_obs_mean'].reindex(master_subjects, fill_value=0)
         total_cells_series = total_cells_series.add(cell_counts, fill_value=0)
         
         print(f"  + Added {cell_type} ({len(adata)} subjects)")
@@ -313,28 +313,28 @@ def rollup_to_patient_level(datasets: dict) -> dict:
         # Convert the sums and the subject names to a DataFrame
         # .layers['sum'] gives raw counts
         df = pd.DataFrame(
-            adata.layers['sum'], 
+            adata.layers['mean'], 
             index=adata.obs['subject'], 
             columns=adata.var_names
         )
         
-        # Group by subject and sum
-        summed_df = df.groupby(level=0, observed=False).sum()
+        # Group by subject and mean
+        meaned_df = df.groupby(level=0, observed=False).mean()
         
         # Create the new AnnData from the summed DataFrame
-        patient_pseudo = ad.AnnData(X=summed_df.values)
-        patient_pseudo.obs_names = summed_df.index.astype(str)
-        patient_pseudo.var_names = summed_df.columns.astype(str)
+        patient_pseudo = ad.AnnData(X=meaned_df.values)
+        patient_pseudo.obs_names = meaned_df.index.astype(str)
+        patient_pseudo.var_names = meaned_df.columns.astype(str)
         
         # Re-attach metadata (AD_status, etc.)
         meta = adata.obs.groupby('subject', observed=False).agg({
             'AD_status': 'first',
-            'n_obs_aggregated': 'sum'
+            'n_obs_aggregated': 'mean'
         })
         
         # Align metadata with the new rows
         patient_pseudo.obs['subject'] = patient_pseudo.obs_names
-        patient_pseudo.obs['n_obs_aggregated'] = meta.loc[patient_pseudo.obs_names, 'n_obs_aggregated']
+        patient_pseudo.obs['n_obs_mean'] = meta.loc[patient_pseudo.obs_names, 'n_obs_aggregated']
         patient_pseudo.obs["cell_type_high_resolution"] = label
         patient_pseudo.obs['AD_status'] = meta.loc[patient_pseudo.obs_names, 'AD_status']
 
