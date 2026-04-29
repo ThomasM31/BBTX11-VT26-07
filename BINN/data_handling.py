@@ -1,5 +1,4 @@
 # Own files
-import custom_train_test_split as ctts
 import optuna
 from binn import BINN
 import binn_training as bt
@@ -14,6 +13,8 @@ import torch.nn as nn
 import torch
 import scanpy as sc
 from sklearn.model_selection import StratifiedKFold
+import scipy
+from sklearn.preprocessing import StandardScaler
 
 # TESTING
 base_path = "/data/shared/alzgene26/data"
@@ -236,7 +237,7 @@ def create_global_with_missing_patients(datasets_dict: dict) -> dict:
         # SAFE ADDITION: .add() is much safer than += 
         global_df = global_df.add(current_df_aligned, fill_value=0.0)
         
-        cell_counts = adata.obs['n_obs_aggregated'].reindex(master_subjects, fill_value=0)
+        cell_counts = adata.obs['n_obs_mean'].reindex(master_subjects, fill_value=0)
         total_cells_series = total_cells_series.add(cell_counts, fill_value=0)
         
         print(f"  + Added {cell_type} ({len(adata)} subjects)")
@@ -286,19 +287,44 @@ def create_global_with_missing_patients(datasets_dict: dict) -> dict:
         global_adata = global_adata[:, variance > 0].copy()
 
     # Normalization Pipeline
+    # TODO: Change ??
     print("Running Scanpy normalization...")
     sc.pp.normalize_total(global_adata, target_sum=1e4)
     sc.pp.log1p(global_adata)
-    sc.pp.scale(global_adata, max_value=10)
+    #sc.pp.scale(global_adata, max_value=10)
 
     # Final verification
-    if np.isnan(global_adata.X).any():
-        print("FAILURE: Matrix still contains NaNs after scaling.")
-    else:
-        print("Matrix is clean.")
+    #if np.isnan(global_adata.X).any():
+    #    print("FAILURE: Matrix still contains NaNs after scaling.")
+    #else:
+    #    print("Matrix is clean.")
 
     print(f"Done! Final Global shape: {global_adata.shape}")
     return global_adata
+
+def scaling_no_leakage(train_adata: ad.AnnData, test_adata: ad.AnnData) -> tuple[ad.AnnData, ad.AnnData]:
+    """
+    Scaling after train test split to minimize leakage
+    """
+    scaler = StandardScaler()
+
+    # Check if data is sparse, convert to dense if necessary for standard scaling
+    if scipy.sparse.issparse(train_adata.X):
+        train_X = train_adata.X.toarray()
+        test_X = test_adata.X.toarray()
+    else:
+        train_X = train_adata.X
+        test_X = test_adata.X
+
+    # Fit on train, transform BOTH
+    train_adata.X = scaler.fit_transform(train_X)
+    test_adata.X = scaler.transform(test_X)
+
+    # Stops extreme outliers from destroying your BINN's gradients
+    train_adata.X[train_adata.X > 10] = 10
+    test_adata.X[test_adata.X > 10] = 10
+
+    return train_adata, test_adata
 
 def rollup_to_patient_level(datasets: dict) -> dict:
     """
@@ -313,28 +339,28 @@ def rollup_to_patient_level(datasets: dict) -> dict:
         # Convert the sums and the subject names to a DataFrame
         # .layers['sum'] gives raw counts
         df = pd.DataFrame(
-            adata.layers['sum'], 
+            adata.layers['mean'], 
             index=adata.obs['subject'], 
             columns=adata.var_names
         )
         
-        # Group by subject and sum
-        summed_df = df.groupby(level=0, observed=False).sum()
+        # Group by subject and mean
+        meaned_df = df.groupby(level=0, observed=False).mean()
         
         # Create the new AnnData from the summed DataFrame
-        patient_pseudo = ad.AnnData(X=summed_df.values)
-        patient_pseudo.obs_names = summed_df.index.astype(str)
-        patient_pseudo.var_names = summed_df.columns.astype(str)
+        patient_pseudo = ad.AnnData(X=meaned_df.values)
+        patient_pseudo.obs_names = meaned_df.index.astype(str)
+        patient_pseudo.var_names = meaned_df.columns.astype(str)
         
         # Re-attach metadata (AD_status, etc.)
         meta = adata.obs.groupby('subject', observed=False).agg({
             'AD_status': 'first',
-            'n_obs_aggregated': 'sum'
+            'n_obs_aggregated': 'mean'
         })
         
         # Align metadata with the new rows
         patient_pseudo.obs['subject'] = patient_pseudo.obs_names
-        patient_pseudo.obs['n_obs_aggregated'] = meta.loc[patient_pseudo.obs_names, 'n_obs_aggregated']
+        patient_pseudo.obs['n_obs_mean'] = meta.loc[patient_pseudo.obs_names, 'n_obs_aggregated']
         patient_pseudo.obs["cell_type_high_resolution"] = label
         patient_pseudo.obs['AD_status'] = meta.loc[patient_pseudo.obs_names, 'AD_status']
 
