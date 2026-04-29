@@ -82,7 +82,7 @@ def plot_sankey(df, n_top=3, filename='sankey_diagram.html'):
     
     # 3. Apply Top-N Filtering & Grouping
     df['layer'] = df['Source'].map(layer_map)
-    final_edges = []
+    final_edges: list[pd.DataFrame] = []
     for layer in sorted(df['layer'].unique()):
         layer_df = df[df['layer'] == layer].copy()
         for target in layer_df['Target'].unique():
@@ -102,51 +102,72 @@ def plot_sankey(df, n_top=3, filename='sankey_diagram.html'):
                 })
                 final_edges.append(other_row)
 
-    df_final = pd.concat(final_edges).reset_index(drop=True)
+    df_final: pd.DataFrame = pd.concat(final_edges).reset_index(drop=True)
 
-    # 4. Vertical Ordering Logic
-    # We create a node dataset and sort it so 'Other connections' has a high sort-index
-    s_imp = df_final.groupby('Source')['Abs_Weight'].sum()
-    t_imp = df_final.groupby('Target')['Abs_Weight'].sum()
-    node_imp = s_imp.add(t_imp, fill_value=0).reset_index()
-    node_imp.columns = ['index', 'importance']
+    # 4. Vertical Ordering & Net Importance Logic
+    s_net = df_final.groupby('Source')['SHAP_Weight'].sum()
+    t_net = df_final.groupby('Target')['SHAP_Weight'].sum()
+    node_net = s_net.add(t_net, fill_value=0).reset_index()
+    node_net.columns = ['index', 'net_weight']
+
+    s_abs = df_final.groupby('Source')['Abs_Weight'].sum()
+    t_abs = df_final.groupby('Target')['Abs_Weight'].sum()
+    node_abs = s_abs.add(t_abs, fill_value=0).reset_index()
+    node_abs.columns = ['index', 'importance']
     
-    # Identify the layer for each node for sorting purposes
-    # A node's layer is either its Source layer or (if it's only a target) Source layer + 1
+    node_imp = pd.merge(node_net, node_abs, on='index')
+    
+    # RE-INSERTED: Identify the layer for each node for sorting purposes
     node_layers = {}
     for _, row in df_final.iterrows():
         node_layers[row['Source']] = layer_map.get(row['Source'], 0)
         if row['Target'] not in node_layers:
             node_layers[row['Target']] = layer_map.get(row['Source'], 0) + 1
 
-    node_imp['layer'] = node_imp['index'].map(node_layers)
-    
-    # Create a Sort Key: "Other connections" gets a value higher than any alphabetic name
-    node_imp['sort_key'] = node_imp['index'].apply(lambda x: f"ZZZZ_{x}" if x == 'Other connections' else x)
-    node_imp = node_imp.sort_values(['layer', 'sort_key']).reset_index(drop=True)
-    
     # 5. Styling & Colors
+    def get_node_color(val, name):
+        if name == "Other connections": return '#D3D3D3'
+        return '#EF553B' if val > 0 else '#636EFA'
+
     def get_edge_color(row):
         if row['Source'] == "Other connections": return '#D3D3D3'
         return '#EF553B' if row['SHAP_Weight'] > 0 else '#636EFA'
 
+    # Apply colors
+    node_imp['node_color'] = node_imp.apply(lambda x: get_node_color(x['net_weight'], x['index']), axis=1)
     df_final['edge_color'] = df_final.apply(get_edge_color, axis=1)
     
-    # Neutralize 'Other' nodes importance so they don't dominate the cmap
-    node_imp.loc[node_imp['index'] == 'Other connections', 'importance'] = 0
-    nodes_ds = hv.Dataset(node_imp, 'index')
+    # Sorting
+    node_imp['layer'] = node_imp['index'].map(node_layers)
+    node_imp['sort_key'] = node_imp['index'].apply(lambda x: f"ZZZZ_{x}" if x == 'Other connections' else x)
+    node_imp = node_imp.sort_values(['layer', 'sort_key']).reset_index(drop=True)
+
+    # CRITICAL: Define vdims so the Sankey object "sees" the color column
+    nodes_ds = hv.Dataset(node_imp, kdims=['index'], vdims=['node_color', 'importance'])
 
     # 6. Plot Generation
+    # Create the Sankey element
+    # Note: we pass 'edge_color' in vdims for the edges and 'node_color' is already in nodes_ds
     sankey = hv.Sankey((df_final, nodes_ds), kdims=['Source', 'Target'], vdims=['Abs_Weight', 'edge_color'])
 
     sankey_obj = sankey.opts(
         opts.Sankey(
-            width=1000, height=600,
-            edge_color='edge_color', edge_alpha=0.6,
-            node_color='importance', node_cmap='YlOrRd',
-            label_position='outer', node_width=20, node_padding=20,
-            iterations=0, # Crucial: Setting to 0 respects our dataframe's vertical order
-            show_values=False
+            width=1000, 
+            height=600,
+            # MAP THE COLORS
+            node_color='node_color',  # Points to the hex code column in nodes_ds
+            edge_color='edge_color',  # Points to the hex code column in df_final
+            
+            # STYLING
+            edge_alpha=0.6,
+            node_width=20,
+            node_padding=20,
+            label_position='outer',
+            iterations=0,
+            show_values=False,
+            
+            # ensure bokeh doesn't override with a default cycle
+            color_index=None 
         )
     )
 
