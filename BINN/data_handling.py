@@ -1,5 +1,4 @@
 # Own files
-import custom_train_test_split as ctts
 import optuna
 from binn import BINN
 import binn_training as bt
@@ -14,6 +13,8 @@ import torch.nn as nn
 import torch
 import scanpy as sc
 from sklearn.model_selection import StratifiedKFold
+import scipy
+from sklearn.preprocessing import StandardScaler
 
 # TESTING
 base_path = "/data/shared/alzgene26/data"
@@ -286,19 +287,44 @@ def create_global_with_missing_patients(datasets_dict: dict) -> dict:
         global_adata = global_adata[:, variance > 0].copy()
 
     # Normalization Pipeline
+    # TODO: Change ??
     print("Running Scanpy normalization...")
     sc.pp.normalize_total(global_adata, target_sum=1e4)
     sc.pp.log1p(global_adata)
-    sc.pp.scale(global_adata, max_value=10)
+    #sc.pp.scale(global_adata, max_value=10)
 
     # Final verification
-    if np.isnan(global_adata.X).any():
-        print("FAILURE: Matrix still contains NaNs after scaling.")
-    else:
-        print("Matrix is clean.")
+    #if np.isnan(global_adata.X).any():
+    #    print("FAILURE: Matrix still contains NaNs after scaling.")
+    #else:
+    #    print("Matrix is clean.")
 
     print(f"Done! Final Global shape: {global_adata.shape}")
     return global_adata
+
+def scaling_no_leakage(train_adata: ad.AnnData, test_adata: ad.AnnData) -> tuple[ad.AnnData, ad.AnnData]:
+    """
+    Scaling after train test split to minimize leakage
+    """
+    scaler = StandardScaler()
+
+    # Check if data is sparse, convert to dense if necessary for standard scaling
+    if scipy.sparse.issparse(train_adata.X):
+        train_X = train_adata.X.toarray()
+        test_X = test_adata.X.toarray()
+    else:
+        train_X = train_adata.X
+        test_X = test_adata.X
+
+    # Fit on train, transform BOTH
+    train_adata.X = scaler.fit_transform(train_X)
+    test_adata.X = scaler.transform(test_X)
+
+    # Stops extreme outliers from destroying your BINN's gradients
+    train_adata.X[train_adata.X > 10] = 10
+    test_adata.X[test_adata.X > 10] = 10
+
+    return train_adata, test_adata
 
 def rollup_to_patient_level(datasets: dict) -> dict:
     """
