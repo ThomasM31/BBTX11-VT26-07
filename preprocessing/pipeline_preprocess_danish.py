@@ -66,7 +66,9 @@ def pipeline(
     #-------ADD METADATA-------
 
     # add disease status
-    pre.add_metadata_non_pseudo(datasets, pp.metadata_path)
+    pre.add_metadata(
+        datasets, 
+        pp.metadata_path / 'individual_metadata_deidentified.tsv')
 
     print(f'finished:')
     for label, adata in datasets.items():

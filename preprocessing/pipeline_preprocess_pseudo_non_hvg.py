@@ -67,22 +67,24 @@ def pipeline(
     #-------PSEUDOBULK AND NORMALIZE-------
 
     # sum counts per subject and high res cell type
-    pre.pseudobulk_non_hvg(datasets)
+    pre.pseudobulk(datasets, 'mean')
     
     #  normalize per pseudobulk sample
     pre.normalize(datasets)
-
-    #-------ADD METADATA-------
-
-    # add disease status
-    pre.add_metadata(datasets, pp.metadata_path)
 
     #-------MOVE PROCESSED DATA TO MAIN LAYER AND SAVE-------
     
     # move pseudobulk data to main layer, discard everything else
     # this will make the files a lot smaller
-    pre.move_pseudo_main(datasets)
+    pre.move_to_main(datasets, 'pseudo')
 
+    #-------ADD METADATA-------
+
+    # add disease status
+    pre.add_metadata(
+        datasets, 
+        pp.metadata_path / 'individual_metadata_deidentified.tsv')
+    
     print(f'finished:')
     for label, adata in datasets.items():
         print(adata)

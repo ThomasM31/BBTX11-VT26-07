@@ -65,10 +65,13 @@ def pipeline(
     
     # prepare filename to read common hvgs
     all_labels = pre.get_labels(list(range(0,9)))
-    hvg_common_filename =  f'{"_".join(all_labels)}_common_{nr_common_hvgs}.txt'
+    hvg_common_filename =  f'{"_".join(all_labels)}_common.csv'
     
     # filter by common hvgs
-    pre.filter_common_hvgs(datasets, pp.hvg_common_path, hvg_common_filename)
+    pre.filter_common_hvgs(
+        datasets, 
+        pp.hvg_common_path / hvg_common_filename, 
+        nr_common_hvgs)
 
     # validates that genes are in original order
     pre.verify_gene_order(datasets, genes_ordered)
@@ -76,24 +79,26 @@ def pipeline(
     #-------PSEUDOBULK AND NORMALIZE-------
 
     # sum counts per subject and high res cell type
-    pre.pseudobulk(datasets)
+    pre.pseudobulk(datasets, 'mean', 'common_hvgs')
     
     #  normalize per pseudobulk sample
     pre.normalize(datasets)
-
-    #-------ADD METADATA-------
-
-    # add disease status
-    pre.add_metadata(datasets, pp.metadata_path)
 
     #-------MOVE PROCESSED DATA TO MAIN LAYER AND SAVE-------
     
     # move pseudobulk data to main layer, discard everything else
     # this will make the files a lot smaller
-    pre.move_pseudo_main(datasets)
+    pre.move_to_main(datasets, 'pseudo')
+
+    #-------ADD METADATA-------
+
+    # add disease status
+    pre.add_metadata(
+        datasets, 
+        pp.metadata_path / 'individual_metadata_deidentified.tsv')
 
     pre.save_files(datasets, pp.compl_full_pipe_path, 'completed')
-    
+
     print('Pipeline completed')
 
 if __name__ == "__main__":

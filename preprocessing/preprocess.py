@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal, Optional
 
 import scanpy as sc
 import pandas as pd
@@ -208,151 +209,88 @@ def filter_genes(datasets: dict, genes_to_keep: list[list[str]]) -> None:
         print(f"{label}: {nr_old_genes} -> {nr_new_genes} genes (removed {nr_old_genes - nr_new_genes})")
 
 
-def prep_for_hvg_sel(datasets: dict) -> None:
-    for label in list(datasets.keys()):
-        dataset = datasets[label]
-        # need to log normalize, some datasets seem to not be properly normalized in the logcounts layer
-        # if we just use the logcounts layer it causes crashes when extracting HVGs
 
-        # using the log-norm data just for feature selection, 
-        # give raw counts to pseudobatch (don't overwrite data with lognorm)
-        dataset.uns['log1p'] = sc.pp.log1p(dataset, copy=True)
-        print(f'\nDataset "{label}" after log normalization')
-        print(dataset)
-
-        dataset_log = dataset.uns['log1p']
-        print(f'min before: {dataset.X.min()}, max before: {dataset.X.max()}')
-        print(f'min after: {dataset_log.X.min()}, max after: {dataset_log.X.max():.1f}')
-
-
-def extract_per_cell_type_hvgs(
-        datasets: dict, 
-        filepath: Path, 
-        n_top_genes: int
-        ) -> None:
+def extract_hvgs_per_cell_type(datasets: dict, filepath: Path):
     '''
-    Writes n most variable genes to text file, per submitted dataset.
+    Writes all genes to file in order of descending variability, 
+    along with variability value.
     '''
-    
-    # Keep only highly variable genes (HVGs)
-    hvgs = []
-
-    # extract HVGs (NOTE: expects normalized data)
-    for label in list(datasets.keys()):
-        print(f'Extracting the {n_top_genes} most variable genes from {label}')
-
-        # use log1p layer
-        adata = datasets[label].uns['log1p']
-
-        sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes)
-        hvg_per_type = adata.var_names[adata.var.highly_variable].tolist()
-
-        # save list of hvgs as textfile
-        # will allow us to find common hvgs later
-        fname = f'{label}_ntop_{n_top_genes}.txt'
-        to = filepath / fname
-        with open(to, 'w') as output:
-            for gene in hvg_per_type:
-                output.write(str(gene) + '\n')
-
-        # save HVGs to dataset
-        datasets[label].uns['hvg'] = datasets[label][:, hvg_per_type].copy()
-        print(f'Writing HVGs for {label}')
-        print(datasets[label].uns['hvg'])
-
-def extract_hvgs_full_list(datasets: dict, filepath: Path):
-    '''
-    Writes all genes to text file in order of descending variability.
-    '''
-
     for label, adata in datasets.items():
+        # identify hvgs
         # seurat v3 flavor uses raw counts, normalized data not needed
         sc.pp.highly_variable_genes(adata, flavor='seurat_v3')
 
-        sorted_genes = adata.var.sort_values('variances_norm', ascending=False).index.tolist()
-
-        # save list of hvgs as textfile
-        # will allow us to find common hvgs later
-        fname = f'{label}.txt'
-        to = filepath / fname
-        with open(to, 'w') as output:
-            for gene in sorted_genes:
-                output.write(str(gene) + '\n')
+        hvg_df = adata.var[['variances_norm']].sort_values('variances_norm', ascending=False)
+        
+        hvg_df.to_csv(filepath / f'{label}.csv', index_label='gene')
 
 
 def find_common_hvgs(
         datasets: dict, 
         filepath_from: Path, 
-        filepath_to: Path,  
-        n_top_genes: int,
-        genes_to_keep: set[str],
-        nr_common_hvgs: int = 1000, 
-        inc_val: int = 3000
+        filepath_to: Path
         ) -> None:
-
+    '''
+    Saves all genes present in input files in order of average variability.
+    '''
     rel_files = []
     for label in datasets:
-        f = f'{label}.txt'
-        if (filepath_from / f).exists():
+        f = filepath_from / f'{label}.csv'
+        if (f).exists():
             rel_files.append(f)
     
-    hvgs = []  
-    for i, file in enumerate(rel_files):
-        path = filepath_from / file
-        with open(path, 'r') as input:
-            genes = input.readlines()
-            genes = set([g.strip('\n') for g in genes])
-            # only keep genes that are also in our list of "acceptable" genes
-            hvgs.append([g for g in genes if g in genes_to_keep])
-
-    def _get_common(hvgs: list, n_top_genes: int) -> list:
-        common_dict = {g: None for g in hvgs[0][:n_top_genes]}
-
-        for hvg_list in hvgs[1:]:
-            print(f'ntop: {n_top_genes}')
-            current_top = set(hvg_list[:n_top_genes])
-            common_dict = {g: None for g in common_dict if g in current_top}
-
-        return list(common_dict.keys())
-
-    common_hvgs = []
-    n = n_top_genes
-    # run the get_common with larger numbers of variables, 
-    # until we get a a value that is at least min_common
-    while len(common_hvgs) < nr_common_hvgs:
-        common_hvgs = _get_common(hvgs, n)
-        n += inc_val
-
-    # just take the min_common most variable
-    common_hvgs = common_hvgs[:nr_common_hvgs]
-    if len(common_hvgs) < nr_common_hvgs:
-        print(f'WARNING: only found {len(common_hvgs)} hvgs')
-
-    print(f'Found {len(common_hvgs)} common HVGs with n_top_genes={n}')
-
-    filename = f'{"_".join(datasets.keys())}_common_{nr_common_hvgs}.txt' 
-    # create text file of all common HVGs
-    with open(filepath_to / filename, 'w') as output:
-        for gene in common_hvgs:
-            output.write(str(gene) + '\n')
-
+    dataframes: list[pd.DataFrame] = []
+    for file in rel_files:
+        temp_df = pd.read_csv(file, index_col='gene')
+        temp_df.columns = [file.stem]
+        dataframes.append(temp_df)
     
+    combined_df = pd.concat(dataframes, axis=1)
+    combined_df['avg_variance'] = combined_df.mean(axis=1)
+    combined_df = combined_df[['avg_variance']]
+
+    combined_df = combined_df.sort_values(by='avg_variance', ascending=False)
+
+    filename = f'{"_".join(datasets.keys())}_common.csv' 
+    combined_df.to_csv(filepath_to / filename)
+
+    print(f'Saved {combined_df.size} common HVGs to:')
+    print(str(filepath_to / filename))
+    
+
 def filter_common_hvgs(
         datasets: dict, 
-        filepath: Path, 
-        filename: str
+        filepath: Path,
+        n: int
         ) -> None:
-    
-    with open(filepath / filename, 'r') as input:
-        genes = input.readlines()
-        common_hvgs = [g.strip('\n') for g in genes]
+    '''
+    Filters data to the n most highly variable genes (avg across cell types).
+    Assumes that all other gene filtering has already been completed. 
 
-    ## save common hvgs in adata object
+    Parameters
+    --------
+    datasets
+        Datasets for filtering.
+    filepath
+        Path to file where common HVGs for included cell type is located. 
+        Assumes that genes are listed in oreder of average variability.
+    n
+        How many common HVGs are to be included in the final dataset.
+    '''
+    hvg_df = pd.read_csv(filepath, index_col='gene')
+
     for label, adata in datasets.items():
-        common_hvgs = [g for g in common_hvgs if g in adata.var_names]
-        datasets[label].uns['common_hvgs'] = adata[:, common_hvgs].copy()
+        # filter to only include genes present in adata
+        hvg_filtered_df = hvg_df[hvg_df.index.isin(adata.var_names)]
+        
+        # n most variable
+        top_genes = hvg_filtered_df.head(n).index
+
+        datasets[label].uns['common_hvgs'] = adata[:, top_genes].copy()
+
         print(f'Writing common hvgs to datset for {label}.')
         print(datasets[label].uns['common_hvgs'])
+
 
 def verify_gene_order(datasets: dict, master_gene_order: list) -> None:
     """
@@ -379,140 +317,131 @@ def verify_gene_order(datasets: dict, master_gene_order: list) -> None:
             
     print("SUCCESS: All datasets maintain original relative gene order.")
 
-def pseudobulk(datasets: dict) -> None:
-    # Perform pseudobulk by test subject and high res celltype
+def pseudobulk(datasets: dict[str, ad.AnnData], 
+               bulk_by: Literal['count_nonzero', 'mean', 'sum', 'var', 'median'],
+               layer_key: Optional[str] = None
+               ) -> None:
+    """
+    Perform pseudobulk by test subject and high res celltype.
 
-    for label in list(datasets.keys()):
-        print(f'Pseudobulking "{label}"')
-
-        pseudo = sc.get.aggregate(
-            datasets[label].uns['common_hvgs'], 
-            by=['subject', 'cell_type_high_resolution'], 
-            func='sum'
-            )
-
-        # moves pseudobulk to the main layer
-        pseudo.X = pseudo.layers['sum'].copy()
-        datasets[label].uns['pseudo'] = pseudo
-        print(datasets[label].uns['pseudo'])
-
-def pseudobulk_non_hvg(datasets: dict) -> None:
-    # Perform pseudobulk by test subject and high res celltype
+    Parameters
+    ----------
+    datasets
+        Dictionary containing AnnData objects to be processed.
+    bulk_by
+        Aggregation function name; must be a valid scanpy.get.aggregate method.
+    layer_key
+        Key in `adata.uns` to use as the data source. If None, uses the main object.
+    """
 
     for label, adata in datasets.items():
         print(f'Pseudobulking "{label}"')
 
+        source = adata.uns[layer_key] if layer_key else adata
+
         pseudo = sc.get.aggregate(
-            adata, 
+            source, 
             by=['subject', 'cell_type_high_resolution'], 
-            func='sum'
+            func=bulk_by
             )
 
-        # moves pseudobulk to the main layer
-        pseudo.X = pseudo.layers['sum'].copy()
-        datasets[label].uns['pseudo'] = pseudo
-        print(datasets[label].uns['pseudo'])
+        pseudo.X = pseudo.layers[bulk_by].copy()
+        adata.uns['pseudo'] = pseudo 
+        print(adata.uns['pseudo'])
+
 
 def normalize(datasets: dict) -> None:
-    for label in list(datasets.keys()):
+    ''' Normalizes pseudobulked data. '''
+    for label, adata in datasets.items():
         print(f'Normalizing: "{label}"')
         
-        adata = datasets[label].uns['pseudo']
+        source = adata.uns['pseudo']
 
         # Normalizes counts per pseudobulk sample
         # There are possible options, e.g. exclude highly expressed genes from computation
-
-        sc.pp.normalize_total(adata, exclude_highly_expressed=False, target_sum=1e4)
+        sc.pp.normalize_total(source, exclude_highly_expressed=False, target_sum=1e4)
 
         # Especially useful if range is large
-        sc.pp.log1p(adata)
+        sc.pp.log1p(source)
 
         # Scaling centers genes at 0
         # Helps model learn *relative* expression
-        sc.pp.scale(adata)
+        sc.pp.scale(source)
 
-        print(adata)
-        print(f'{label:<8} has min: {adata.X.min():.2f} and max: {adata.X.max():.2f}')
+        print(source)
+        print(f'{label:<8} has min: {source.X.min():.2f} and max: {source.X.max():.2f}')
 
 
-def add_metadata(datasets: dict, filepath: Path, is_float=True) -> None:
-    # Add subject disease status metadata
-    file = 'individual_metadata_deidentified.tsv'
-    p = filepath / file
-    metadata = pd.read_csv(p,sep='\t')
+def add_metadata(
+        datasets: dict, 
+        filepath: Path, 
+        layer_key: Optional[str] = None, 
+        is_float=True
+        ) -> None:
+    '''
+    Add subject disease status metadata
+    
+    Parameters
+    --------
+    datasets
+        Dictionary containing AnnData objects to be processed.
+    filepath
+        Path to metadata csv file containing per subject disease status
+    layer_key
+        Key in `adata.uns` to use as the data source. If None, uses the main object.
+    is_float
+        Set disease status to float or int (default float). 
+        Float recommended for logit loss, int recommended for BCE loss
+    '''
+    metadata = pd.read_csv(filepath, sep='\t')
 
+    subj_lbl = 'subject'
     AD_status_lbl = 'Pathologic_diagnosis_of_AD'
-    md_sel = metadata[['subject', AD_status_lbl]]
+    md_sel = metadata[[subj_lbl, AD_status_lbl]]
 
-    # Annotate the data with the disease status of the subject
-
-    # floats for logits loss
-    # int for BCE loss
     v_yes, v_no = (1.0, 0.0) if is_float else (1, 0)
     
     md_sel = md_sel.copy()
     md_sel[AD_status_lbl] = md_sel[AD_status_lbl].replace({'yes': v_yes, 'no': v_no})
 
     # create map with subject as key, AD status as value
-    status_map = dict(zip(md_sel['subject'], md_sel[AD_status_lbl]))
+    status_map = dict(zip(md_sel[subj_lbl], md_sel[AD_status_lbl]))
 
-    for label in list(datasets.keys()):
-        pseudo = datasets[label].uns['pseudo']
-        subjects = pseudo.obs['subject'].astype(str).values
+    for label, adata in datasets.items():
+        print(f'Adding metadata to {label}.')
+        source = adata.uns[layer_key] if layer_key else adata
+        subjects = source.obs[subj_lbl].astype(str).values
 
-        pseudo.obs['AD_status'] = [str(status_map.get(s)) for s in subjects]
-        pseudo.obs['AD_status'] = pseudo.obs['AD_status'].astype('category')
-
-def add_metadata_non_pseudo(datasets: dict, filepath: Path, is_float=True) -> None:
-    # Add subject disease status metadata
-    file = 'individual_metadata_deidentified.tsv'
-    p = filepath / file
-    metadata = pd.read_csv(p,sep='\t')
-
-    AD_status_lbl = 'Pathologic_diagnosis_of_AD'
-    md_sel = metadata[['subject', AD_status_lbl]]
-
-    # Annotate the data with the disease status of the subject
-
-    # floats for logits loss
-    # int for BCE loss
-    v_yes, v_no = (1.0, 0.0) if is_float else (1, 0)
-    
-    md_sel = md_sel.copy()
-    md_sel[AD_status_lbl] = md_sel[AD_status_lbl].replace({'yes': v_yes, 'no': v_no})
-
-    # create map with subject as key, AD status as value
-    status_map = dict(zip(md_sel['subject'], md_sel[AD_status_lbl]))
+        AD_status_lbl = 'AD_status'
+        source.obs[AD_status_lbl] = [str(status_map.get(s)) for s in subjects]
+        source.obs[AD_status_lbl] = source.obs[AD_status_lbl].astype('category')
 
     for label, adata in datasets.items():
         #pseudo = datasets[label].uns['pseudo']
-        subjects = adata.obs['subject'].astype(str).values
+        subjects = adata.obs[subj_lbl].astype(str).values
 
-        adata.obs['AD_status'] = [str(status_map.get(s)) for s in subjects]
-        adata.obs['AD_status'] = adata.obs['AD_status'].astype('category')
+        adata.obs[AD_status_lbl] = [str(status_map.get(s)) for s in subjects]
+        adata.obs[AD_status_lbl] = adata.obs[AD_status_lbl].astype('category')
 
-
-def move_pseudo_main(datasets: dict):
+def move_to_main(datasets: dict, layer_key: str):
+    '''
+    Move layer from `adata.uns` to main object
+    '''
     for label, adata in datasets.items():
-        pseudo = adata.uns['pseudo']
+        from_layer = adata.uns[layer_key]
 
-        datasets[label] = ad.AnnData(pseudo)
+        datasets[label] = ad.AnnData(from_layer)
 
-        print(f'Dataset {label} after moving pseudo to main:')
+        print(f'Dataset {label} after moving {layer_key} to main:')
         print(datasets[label])
-
-def move_hvgs_main(datasets):
-    for label, adata in datasets.items():
-        hvgs = datasets[label].uns['common_hvgs']
-        datasets[label] = ad.AnnData(hvgs)
 
 def save_files(datasets: dict, filepath: Path, stage:str) -> None:
     print(f'Writing files at stage "{stage}"')
+    filepath.mkdir(parents=True, exist_ok=True)
     
     for label in list(datasets.keys()):
         print(f'Writing "{label}" to file.')
         to = filepath / f'{label}.h5ad'
-
         datasets[label].write_h5ad(to)
 
     print(f'Writing to file(s) at stage {stage} done! Path:')

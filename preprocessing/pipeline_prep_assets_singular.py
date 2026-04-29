@@ -60,7 +60,7 @@ def pipeline(
     print('Ordering genes by variability')
     for label, adata in datasets.items():
         train_adata = adata[adata.obs['subject'].isin(sample['subject'])].copy()
-        pre.extract_hvgs_full_list({label:train_adata}, pp.hvg_lists_path)
+        pre.extract_hvgs_per_cell_type({label:train_adata}, pp.hvg_lists_path)
     
     print('Pipeline completed')
 

@@ -11,11 +11,7 @@ DOES TASKS THAT MUST BE DONE FOR SEVERAL DATASETS AT ONCE.
 
 def pipeline(
         to_include: list, 
-        n_top_genes: int, 
-        min_genes: int, 
         min_cells:int,
-        nr_common_hvgs:int,
-        common_hvg_inc_value:int,
         shared_dir_mode: bool
         ) -> None:
     
@@ -45,8 +41,9 @@ def pipeline(
     # so we don't get genes in our list of common HVGs that we don't want to use.
     genes_to_keep = []
     # get genes with expression over threshold from file
-    genes_to_keep.extend(pre.get_expressed_genes(
-        datasets, pp.genes_keep_path, min_cells))
+    genes_to_keep.extend(
+        pre.get_expressed_genes(datasets, pp.genes_keep_path, min_cells)
+        )
 
     # get genes that exist in reactome from file
     save_file = Path('reactome_genes.txt')
@@ -57,11 +54,7 @@ def pipeline(
     pre.find_common_hvgs(
         datasets, 
         pp.hvg_lists_path, 
-        pp.hvg_common_path,
-        n_top_genes, 
-        genes_to_keep,
-        nr_common_hvgs, 
-        common_hvg_inc_value
+        pp.hvg_common_path
         )
 
     print('Pipeline completed')
@@ -130,19 +123,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     to_include = args.to_include
-    n_top = args.n_top_genes
     min_cells = args.gene_in_min_cells
-    min_genes = args.cell_with_min_genes
-    nr_common_hvgs = args.nr_common_hvgs
-    common_hvg_inc_value = args.common_hvg_inc_value
     shared_dir_mode = args.shared_dir_mode
 
     pipeline(
         to_include, 
-        n_top_genes=n_top, 
-        min_genes=min_genes, 
-        min_cells=min_cells, 
-        nr_common_hvgs=nr_common_hvgs, 
-        common_hvg_inc_value=common_hvg_inc_value,
+        min_cells=min_cells,
         shared_dir_mode = shared_dir_mode
         )
