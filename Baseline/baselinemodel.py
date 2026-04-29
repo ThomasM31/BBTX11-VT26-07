@@ -8,6 +8,7 @@ from sklearn.metrics import classification_report, roc_auc_score, roc_curve
 import BINN.data_handling as dh
 import BINN.custom_train_test_split as ctts
 import matplotlib.pyplot as plt
+import pandas as pd
 
 # anndata
 import anndata as ad
@@ -72,6 +73,12 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     print(f"Mean CV AUC: {scores.mean():.4f}")
 
     y_pred = clf_svm.predict(X_test_pca)
+    df_svm = pd.DataFrame({
+        'y_true': y_test, 
+        'y_prob': y_scores
+    })
+    df_svm.to_csv("svm_test_results.csv", index=False)
+    print("Saved: svm_test_results.csv")
     print(classification_report(y_test, y_pred))
 
 # GLOBALS
