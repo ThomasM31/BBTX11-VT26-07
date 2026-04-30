@@ -1,7 +1,7 @@
 *.h5ad
 *.log
 *.err
-*.out
+#*.out
 *.pyc
 .vscode
 .venv/

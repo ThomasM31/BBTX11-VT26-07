@@ -12,13 +12,14 @@ import pandas as pd
 EPOCHS = 200
 TRAIN_SIZE = 0.8
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-MASK_PATHS = [f("/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
-            for i in range(5))]
+MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+            for i in range(5)]
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
 LR = 9.76e-3
 WEIGHT_DECAY = 9.96e-2
 DROPOUT = 1.699e-1
+BATCH_SIZE = 32
 ACTIVATION_FN = nn.Tanh()
 
 def pipeline(to_include=ALL_CELLTYPES, 
@@ -27,15 +28,7 @@ def pipeline(to_include=ALL_CELLTYPES,
              d_path=data_path, 
              m_paths=MASK_PATHS):
     """
-    TODO: UPDATE ?
-    - Load completed+preprocessed .h5ad data
-    - Create dataloaders
-    - Read pathways + create mask matrices
-    - Init BINN
-    - Feed data:
-        # Train BINN
-        # Test BINN
-    - Evaluate + Interpret BINN
+    Performs the full binn_pipeline(), including 
     """
     print("Starting pipeline...")
     print("Fetching device...")
@@ -71,37 +64,23 @@ def pipeline(to_include=ALL_CELLTYPES,
 
     print("Starting Global Rollup with missing subject handling...")
     adata_global = dh.create_global_with_missing_patients(datasets_padded)
-    #print("Creating AnnCollection...")
-    #acollection = ctts.create_encoded_collection(datasets_aligend)
+
     print("Creating train/test split...")
     train_adata, test_adata = ctts.custom_train_test_split(adata_global, train_size=train_size)
 
     print("Getting dataloaders...")
-    train_loader, test_loader = dh.create_dataloaders(train_adata, test_adata)
+    train_loader, test_loader = dh.create_dataloaders(train_adata, test_adata, batch_size=BATCH_SIZE)
 
     print("Running train/test loop...")
     history = dh.training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, epochs)
 
     print("Fetching metrics...")
-    dh.fetch_best_metrics(history)
+    best_train_acc_i, best_test_acc_i, best_train_loss_i, best_test_loss_i = dh.fetch_best_metrics(history)
 
     # Save test results:
     print("Generating and saving test predictions for visualization...")
-    model.eval()
-    all_labels, all_probs = [], []
+    df_res = dh.save_test_results(model, test_loader, device)
 
-    with torch.no_grad():
-        for inputs, labels in test_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = model(inputs)
-            probs = torch.sigmoid(outputs)
-            all_labels.extend(labels.cpu().numpy().flatten())
-            all_probs.extend(probs.cpu().numpy().flatten())
-
-    df_res = pd.DataFrame({'y_true': all_labels, 'y_prob': all_probs})
-    df_res.to_csv("binn_test_results.csv", index=False)
-    print("Saved: binn_test_results.csv")
-    
     print("Pipeline completed!")
 
 if __name__ == "__main__":

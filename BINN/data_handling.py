@@ -654,3 +654,30 @@ def hyperparameter_tuning_optuna(adata,
     print(f"Best Mean CV ROC-AUC: {study.best_value:.4f}")
 
     return study.best_params
+
+def save_test_results(model, test_loader, device) -> pd.DataFrame:
+    """
+    Saves the testing results for visualization
+    """
+    model.eval()
+    all_labels, all_probs = [], []
+
+    with torch.no_grad():
+            for batch in test_loader:
+                inputs = batch.X.float().to(device)
+
+                if type(batch.obs["AD_status"]) is pd.Series:
+                    labels = torch.tensor(batch.obs['AD_status'].values.astype(float)).float().reshape(-1, 1).to(device)
+                else:
+                    labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
+
+                outputs = model(inputs)
+                probs = torch.sigmoid(outputs)
+                all_labels.extend(labels.cpu().numpy().flatten())
+                all_probs.extend(probs.cpu().numpy().flatten())
+
+    df_res = pd.DataFrame({'y_true': all_labels, 'y_prob': all_probs})
+    df_res.to_csv("binn_test_results.csv", index=False)
+    print("Saved: binn_test_results.csv")
+    return df_res
+
