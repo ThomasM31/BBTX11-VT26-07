@@ -1,12 +1,8 @@
 import argparse
-import os
-from binn import BINN
-import binn_training as bt
 import data_handling as dh
 import custom_train_test_split as ctts
 import torch
 import torch.nn as nn
-import pandas as pd
 
 # GLOBALS
 EPOCHS = 200
@@ -14,13 +10,15 @@ TRAIN_SIZE = 0.8
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
             for i in range(5)]
-base_path = "/data/shared/alzgene26/data"
-data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
 LR = 9.76e-3
 WEIGHT_DECAY = 9.96e-2
 DROPOUT = 1.699e-1
 BATCH_SIZE = 32
 ACTIVATION_FN = nn.Tanh()
+
+# PATHS
+base_path = "/data/shared/alzgene26/data"
+data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
 
 def pipeline(to_include=ALL_CELLTYPES, 
              epochs=EPOCHS, 
@@ -38,7 +36,6 @@ def pipeline(to_include=ALL_CELLTYPES,
     masks = dh.read_masks(m_paths)
 
     print("Computing BINN features...")
-    # NOTE: Needs 4 return values here?
     mask_matrix_list, in_features, layers_list, tensor_masks = dh.compute_features(masks, device)
 
     print("Creating BINN...")
@@ -64,7 +61,6 @@ def pipeline(to_include=ALL_CELLTYPES,
     print("Aligning adatas to BINN...")
     datasets_aligend = dh.subset_genes(patient_datasets, masks['df0'])
 
-    # TODO: Delete? Should not be needed?
     print("Padding adatas to BINN-ready shape...")
     datasets_padded = dh.pad_align_data(datasets_aligend, masks["df0"])
 
@@ -83,7 +79,6 @@ def pipeline(to_include=ALL_CELLTYPES,
     print("Fetching metrics...")
     best_train_acc_i, best_test_acc_i, best_train_loss_i, best_test_loss_i = dh.fetch_best_metrics(history)
 
-    # Save test results:
     print("Generating and saving test predictions for visualization...")
     df_res = dh.save_test_results(model, test_loader, device)
 
