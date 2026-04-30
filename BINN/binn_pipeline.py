@@ -49,6 +49,12 @@ def pipeline(to_include=ALL_CELLTYPES,
     print("Showing BINN...")
     print(model)
 
+    print("Searching for dead biological nodes...")
+    dead_nodes_dict = dh.find_dead_outputs(model, tensor_masks)
+
+    print("Showing dead nodes...")
+    dh.show_dead_nodes(dead_nodes_dict, masks)
+
     print("Reading data into datasets...")
     datasets = ctts.read_files(to_include=to_include, filepath=d_path)
 

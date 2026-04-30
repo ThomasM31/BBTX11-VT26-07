@@ -481,7 +481,7 @@ def find_dead_outputs(model, mask_matrix_list):
     """
     Finds and returns the indices of structurally dead nodes in the masks.
     """
-    dead_indices_dict = {}
+    dead_nodes_dict = {}
     
     for i in range(len(mask_matrix_list)):
         mask = getattr(model, f'mask_{i}')
@@ -499,11 +499,18 @@ def find_dead_outputs(model, mask_matrix_list):
             # Convert to a list (handles both single and multiple dead nodes)
             indices_list = dead_indices.tolist() if dead_indices.dim() > 0 else [dead_indices.item()]
             print(f"Layer {i} has {len(indices_list)} dead node(s) at index/indices: {indices_list}")
-            dead_indices_dict[f'Layer_{i}'] = indices_list
+            dead_nodes_dict[f'Layer_{i}'] = indices_list
         else:
             print(f"Layer {i} has no dead outputs.")
             
-    return dead_indices_dict
+    return dead_nodes_dict
+
+def show_dead_nodes(dead_nodes_dict:dict, masks) -> None:
+    """
+    Print which biological nodes are dead in the BINN
+    """
+    for dead in dead_nodes_dict:
+        print(masks[f"df{dead[-1]}"].columns[dead_nodes_dict[dead]])
     
 def evaluate_model_roc(model, test_loader: AnnLoader, device) -> tuple[np.array, np.array]:
     """
