@@ -85,7 +85,7 @@ def pipeline(to_include=ALL_CELLTYPES,
     print("Fetching metrics...")
     dh.fetch_best_metrics(history)
 
-    # --- YOUR ADDITION: SAVE TEST RESULTS ---
+    # Save test results:
     print("Generating and saving test predictions for visualization...")
     model.eval()
     all_labels, all_probs = [], []
