@@ -477,18 +477,33 @@ def training_loop(model: BINN,
     
     return history
 
-def dead_output_check(model: BINN, mask_matrix_list: list) -> None:
+def find_dead_outputs(model, mask_matrix_list):
     """
-    Check the mask matrix list for dead outputs in all layers
+    Finds and returns the indices of structurally dead nodes in the masks.
     """
+    dead_indices_dict = {}
+    
     for i in range(len(mask_matrix_list)):
         mask = getattr(model, f'mask_{i}')
-        # Check for rows (output neurons) with no active inputs
-        dead_outputs = (mask.sum(dim=1 if mask.shape[1] > mask.shape[0] else 0) == 0).sum()
-        if dead_outputs > 0:
-            print(f"Layer {i} has {dead_outputs} dead nodes with zero biological connections!")
+        
+        # Calculate sum along the correct dimension
+        dim_to_sum = 1 if mask.shape[1] > mask.shape[0] else 0
+        connections_per_node = mask.sum(dim=dim_to_sum)
+        
+        # Find exactly where the sum is 0
+        dead_mask = (connections_per_node == 0)
+        dead_indices = torch.nonzero(dead_mask).squeeze()
+        
+        # Format the output cleanly
+        if dead_indices.numel() > 0: # If there is at least 1 dead node
+            # Convert to a list (handles both single and multiple dead nodes)
+            indices_list = dead_indices.tolist() if dead_indices.dim() > 0 else [dead_indices.item()]
+            print(f"Layer {i} has {len(indices_list)} dead node(s) at index/indices: {indices_list}")
+            dead_indices_dict[f'Layer_{i}'] = indices_list
         else:
-            print(f"Layer {i} has no dead outputs")
+            print(f"Layer {i} has no dead outputs.")
+            
+    return dead_indices_dict
     
 def evaluate_model_roc(model, test_loader: AnnLoader, device) -> tuple[np.array, np.array]:
     """
