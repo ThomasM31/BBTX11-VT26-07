@@ -5,9 +5,6 @@ import torch
 import torch.nn as nn
 
 # GLOBALS
-EPOCHS = 200
-TRAIN_SIZE = 0.8
-ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
             for i in range(5)]
 LR = 9.76e-3
@@ -20,11 +17,12 @@ ACTIVATION_FN = nn.Tanh()
 base_path = "/data/shared/alzgene26/data"
 data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
 
-def pipeline(to_include=ALL_CELLTYPES, 
-             epochs=EPOCHS, 
-             train_size=TRAIN_SIZE, 
+def pipeline(to_include=list, 
+             epochs=int, 
+             train_size=float, 
              d_path=data_path, 
-             m_paths=MASK_PATHS):
+             m_paths=MASK_PATHS,
+             tune_hyperparameters=False):
     """
     Performs the full binn_pipeline(), including 
     """
@@ -82,13 +80,46 @@ def pipeline(to_include=ALL_CELLTYPES,
     print("Generating and saving test predictions for visualization...")
     df_res = dh.save_test_results(model, test_loader, device)
 
+    if tune_hyperparameters:
+        best_params = dh.hyperparameter_tuning_optuna(adata_global, in_features, layers_list, tensor_masks, 
+                                                device, batch_size=BATCH_SIZE, activation_fn=ACTIVATION_FN,
+                                                k=5, epochs=epochs)
+        print(f"Best parameters for BINN: {best_params}")
+
     print("Pipeline completed!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run annData objects through BINN pipeline")
     parser.add_argument("to_include", type=int, nargs='+', help="indices to include")
-    
+
+    # Optional argument tune_hyperparameters
+    parser.add_argument(
+        "--tune_hyperparameters", 
+        type=bool,
+        default=False,
+        help="Tune hyperparameters or not, takes some time"
+    )
+
+    # Optional argument epochs
+    parser.add_argument(
+        "--epochs", 
+        type=int,
+        default=200,
+        help="Amount of epochs to run network for"
+    )
+
+    # Optional argument train_size
+    parser.add_argument(
+        "--train_size", 
+        type=float,
+        default=0.8,
+        help="Train split size, test gets othe 1-train_size"
+    )
+
     args = parser.parse_args()
 
     # Call pipeline with terminal arguments
-    pipeline(to_include=args.to_include)
+    pipeline(to_include=args.to_include, 
+             tune_hyperparameters=args.tune_hyperparameters,
+             epochs=args.epochs,
+             train_size=args.train_size)
