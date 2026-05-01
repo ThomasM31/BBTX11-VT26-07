@@ -7,8 +7,8 @@ import torch.nn as nn
 # GLOBALS
 MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
             for i in range(5)]
-LR = 9.76e-3
-WEIGHT_DECAY = 9.96e-2
+LR = 5e-4
+WEIGHT_DECAY = 0.3
 DROPOUT = 1.699e-1
 BATCH_SIZE = 32
 ACTIVATION_FN = nn.Tanh()
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--epochs", 
         type=int,
-        default=200,
+        default=250,
         help="Amount of epochs to run network for"
     )
 
