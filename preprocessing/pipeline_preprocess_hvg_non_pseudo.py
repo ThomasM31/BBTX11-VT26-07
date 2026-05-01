@@ -2,7 +2,13 @@ import preprocess as pre
 import argparse
 import os
 from pathlib import Path
-import pipeline_paths as ppaths
+import importlib.util
+
+# import module for consistent paths
+path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
+spec = importlib.util.spec_from_file_location("ppaths", path)
+ppaths = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ppaths)
 
 '''
 THE ACTUAL PREPROCESSING PIPELINE. USES DATA CREATED BY THE FIRST TWO PREP PIPELINES.

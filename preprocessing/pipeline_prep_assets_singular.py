@@ -2,8 +2,15 @@ import preprocess as pre
 import argparse
 import os
 from pathlib import Path
-import pipeline_paths as ppaths
 import pandas as pd
+from sklearn.model_selection import train_test_split
+import importlib.util
+
+# import module for consistent paths
+path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
+spec = importlib.util.spec_from_file_location("ppaths", path)
+ppaths = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ppaths)
 
 '''
 FIRST PIPELINE TO PREPARE DATA FOR PREPROCESSING.
@@ -17,7 +24,7 @@ def pipeline(
         ) -> None:
     
     pp = ppaths.PipelinePaths(shared_dir_mode)
-
+    
     #-------START PROCESSING-------
 
     # from int to readable labels
@@ -44,14 +51,20 @@ def pipeline(
     print('Selecting training subjects.')
     path = pp.metadata_path / 'individual_metadata_deidentified.tsv'
     metadata = pd.read_csv(path, sep='\t')
-    md_sel = metadata[['subject']]
-    # use the same random state for all cell types so we get same subjects for all
-    sample = md_sel.sample(frac=train_size, random_state=92)
+    md_sel = metadata[['subject', 'Pathologic_diagnosis_of_AD']]
+    
+    # train-test split (equal fraction AD, non-AD in datasets)
+    train_df, test_df = train_test_split(
+        md_sel, 
+        train_size=train_size, 
+        random_state=92, 
+        stratify=md_sel['Pathologic_diagnosis_of_AD']
+    )
 
     # keep track of which subjects are to be used as train subjects
     train_subjects_save_path = pp.metadata_path / 'train_subjects.tsv'
-    print(f'Writing {sample.size} train subjects to {train_subjects_save_path}')
-    sample.to_csv(train_subjects_save_path)
+    print(f'Writing train subjects to {train_subjects_save_path}')
+    train_df.to_csv(train_subjects_save_path)
     
     # make one .txt file for each cell type with 
     # genes sorted from most to least variable 
@@ -59,7 +72,7 @@ def pipeline(
     # this method does not require normalized data
     print('Ordering genes by variability')
     for label, adata in datasets.items():
-        train_adata = adata[adata.obs['subject'].isin(sample['subject'])].copy()
+        train_adata = adata[adata.obs['subject'].isin(train_df['subject'])].copy()
         pre.extract_hvgs_per_cell_type({label:train_adata}, pp.hvg_lists_path)
     
     print('Pipeline completed')

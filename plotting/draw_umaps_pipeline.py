@@ -3,10 +3,16 @@ import argparse
 from pathlib import Path
 import sys
 
-parent = Path(__file__).resolve().parent.parent
-sys.path.append(str(parent))
+from pathlib import Path
+import importlib.util
 
-from preprocessing import pipeline_paths as ppaths
+# import module for consistent paths
+path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
+spec = importlib.util.spec_from_file_location("ppaths", path)
+ppaths = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ppaths)
+
+
 from preprocessing import preprocess as pre
 
 

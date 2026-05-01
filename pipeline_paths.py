@@ -44,6 +44,8 @@ class PipelinePaths:
         self.danish_figs          = self.figures_path / "danish" 
         self.pseudo_non_hvg_figs   = self.figures_path / "pseudo_non_hvg" / pseudo_non_hvg_run_vars
         self.hvg_non_pseudo_figs  = self.figures_path / "hvg_non_pseudo" / hvg_non_pseudo_run_vars
+
+        self.figures_path_shap         = data_path / "figures" / "shap"
         
         # to save smaller files that are faster to read
         self.test_data_path       = data_path / processed_data / "test_data"
@@ -58,6 +60,12 @@ class PipelinePaths:
         self.compl_path_danish    = self.compl_base / "danish"
         self.compl_hvg_non_pseudo = self.compl_base / "hvg_non_pseudo" / hvg_non_pseudo_run_vars
         self.compl_pseudo_non_hvg = self.compl_base / "pseudo_non_hvg" / pseudo_non_hvg_run_vars
+
+        self.mask_base = self.pathway_data_path / "MaskMatrixLayers"
+        self.mask_full_pipe_path = self.mask_base / "full_pipeline" / full_pipeline_run_vars
+        self.mask_path_danish    = self.mask_base / "danish"
+        self.mask_hvg_non_pseudo = self.mask_base / "hvg_non_pseudo" / hvg_non_pseudo_run_vars
+        self.mask_pseudo_non_hvg = self.mask_base / "pseudo_non_hvg" / pseudo_non_hvg_run_vars
 
         self.extra_test_path = data_path / processed_data/ "test_path"
 

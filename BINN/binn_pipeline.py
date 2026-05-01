@@ -3,12 +3,27 @@ import data_handling as dh
 import custom_train_test_split as ctts
 import torch
 import torch.nn as nn
+import shap_explainer
+import pandas as pd
+from pathlib import Path
+import importlib.util
+
+# import module for consistent paths
+path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
+spec = importlib.util.spec_from_file_location("ppaths", path)
+ppaths = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ppaths)
+
+# PATHS
+pp = ppaths.PipelinePaths(True, 'mg_200_mc_200_mhvg1000')
+data_path = pp.compl_full_pipe_path
+mask_path = pp.mask_full_pipe_path
 
 # GLOBALS
 EPOCHS = 200
 TRAIN_SIZE = 0.8
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+MASK_PATHS = [mask_path / f"oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
             for i in range(5)]
 LR = 9.76e-3
 WEIGHT_DECAY = 9.96e-2
@@ -16,9 +31,6 @@ DROPOUT = 1.699e-1
 BATCH_SIZE = 32
 ACTIVATION_FN = nn.Tanh()
 
-# PATHS
-base_path = "/data/shared/alzgene26/data"
-data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
 
 def pipeline(to_include=ALL_CELLTYPES, 
              epochs=EPOCHS, 
@@ -68,7 +80,8 @@ def pipeline(to_include=ALL_CELLTYPES,
     adata_global = dh.create_global_with_missing_patients(datasets_padded)
 
     print("Creating train/test split...")
-    train_adata, test_adata = ctts.custom_train_test_split(adata_global, train_size=train_size)
+    train_subjects = pd.read_csv(pp.metadata_path / 'train_subjects.tsv')
+    train_adata, test_adata = ctts.predefined_subject_train_test_split(adata_global, train_subjects)
 
     print("Getting dataloaders...")
     train_loader, test_loader = dh.create_dataloaders(train_adata, test_adata, batch_size=BATCH_SIZE)
@@ -81,6 +94,12 @@ def pipeline(to_include=ALL_CELLTYPES,
 
     print("Generating and saving test predictions for visualization...")
     df_res = dh.save_test_results(model, test_loader, device)
+
+    print("Perform SHAP analysis...")
+    X_train_tensor = torch.tensor(train_adata.X.toarray(), dtype=torch.float32).to(device)
+    X_test_tensor = torch.tensor(test_adata.X.toarray(), dtype=torch.float32).to(device)
+    gene_names = masks['df0'].index.tolist()
+    shap_explainer.perform_shap(model, X_train_tensor, X_test_tensor, gene_names, pp.figures_path_shap)
 
     print("Pipeline completed!")
 
