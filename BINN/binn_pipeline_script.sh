@@ -35,7 +35,7 @@ export PYTHONUNBUFFERED=1
 
 # Run the Python script
 # We use 'time' to see how long the Python process actually took
-time python3 -u BINN/binn_pipeline.py 0 1 2 3 4 5 6 7 8
+time python3 -u BINN/binn_pipeline.py 0 1 2 3 4 5 6 7 8 #--tune_hyperparameters False
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?

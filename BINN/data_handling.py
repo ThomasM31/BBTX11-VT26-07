@@ -532,9 +532,9 @@ def evaluate_model_roc(model, test_loader: AnnLoader, device) -> tuple[np.array,
             logits = model(inputs)
             # Apply sigmoid to get probabilities [0, 1]
             probs = torch.sigmoid(logits).cpu().numpy()
-            
+
+            all_labels.extend(labels.cpu().numpy())
             all_probs.extend(probs)
-            all_labels.extend(labels)
             
     # fetch probabilites and target labels
     probs, targets = np.array(all_probs).flatten(), np.array(all_labels).flatten()

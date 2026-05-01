@@ -20,23 +20,21 @@ data_path = pp.compl_full_pipe_path
 mask_path = pp.mask_full_pipe_path
 
 # GLOBALS
-EPOCHS = 200
-TRAIN_SIZE = 0.8
-ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 MASK_PATHS = [mask_path / f"oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
             for i in range(5)]
-LR = 9.76e-3
-WEIGHT_DECAY = 9.96e-2
+LR = 5e-4
+WEIGHT_DECAY = 0.3
 DROPOUT = 1.699e-1
 BATCH_SIZE = 32
 ACTIVATION_FN = nn.Tanh()
 
 
-def pipeline(to_include=ALL_CELLTYPES, 
-             epochs=EPOCHS, 
-             train_size=TRAIN_SIZE, 
+def pipeline(to_include=list, 
+             epochs=int, 
+             train_size=float, 
              d_path=data_path, 
-             m_paths=MASK_PATHS):
+             m_paths=MASK_PATHS,
+             tune_hyperparameters=False):
     """
     Performs the full binn_pipeline(), including 
     """
@@ -95,19 +93,54 @@ def pipeline(to_include=ALL_CELLTYPES,
     print("Generating and saving test predictions for visualization...")
     df_res = dh.save_test_results(model, test_loader, device)
 
+    if tune_hyperparameters:
+        best_params = dh.hyperparameter_tuning_optuna(adata_global, in_features, layers_list, tensor_masks, 
+                                                device, batch_size=BATCH_SIZE, activation_fn=ACTIVATION_FN,
+                                                k=5, epochs=epochs)
+        print(f"Best parameters for BINN: {best_params}")
+    
     print("Perform SHAP analysis...")
     X_train_tensor = torch.tensor(train_adata.X.toarray(), dtype=torch.float32).to(device)
     X_test_tensor = torch.tensor(test_adata.X.toarray(), dtype=torch.float32).to(device)
     gene_names = masks['df0'].index.tolist()
     shap_explainer.perform_shap(model, X_train_tensor, X_test_tensor, gene_names, pp.figures_path_shap)
 
+    
+
     print("Pipeline completed!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run annData objects through BINN pipeline")
     parser.add_argument("to_include", type=int, nargs='+', help="indices to include")
-    
+
+    # Optional argument tune_hyperparameters
+    parser.add_argument(
+        "--tune_hyperparameters", 
+        type=bool,
+        default=False,
+        help="Tune hyperparameters or not, takes some time"
+    )
+
+    # Optional argument epochs
+    parser.add_argument(
+        "--epochs", 
+        type=int,
+        default=250,
+        help="Amount of epochs to run network for"
+    )
+
+    # Optional argument train_size
+    parser.add_argument(
+        "--train_size", 
+        type=float,
+        default=0.8,
+        help="Train split size, test gets othe 1-train_size"
+    )
+
     args = parser.parse_args()
 
     # Call pipeline with terminal arguments
-    pipeline(to_include=args.to_include)
+    pipeline(to_include=args.to_include, 
+             tune_hyperparameters=args.tune_hyperparameters,
+             epochs=args.epochs,
+             train_size=args.train_size)
