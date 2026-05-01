@@ -31,7 +31,6 @@ ACTIVATION_FN = nn.Tanh()
 
 def pipeline(to_include=list, 
              epochs=int, 
-             train_size=float, 
              d_path=data_path, 
              m_paths=MASK_PATHS,
              tune_hyperparameters=False):
@@ -105,8 +104,6 @@ def pipeline(to_include=list,
     gene_names = masks['df0'].index.tolist()
     shap_explainer.perform_shap(model, X_train_tensor, X_test_tensor, gene_names, pp.figures_path_shap)
 
-    
-
     print("Pipeline completed!")
 
 if __name__ == "__main__":
@@ -129,18 +126,9 @@ if __name__ == "__main__":
         help="Amount of epochs to run network for"
     )
 
-    # Optional argument train_size
-    parser.add_argument(
-        "--train_size", 
-        type=float,
-        default=0.8,
-        help="Train split size, test gets othe 1-train_size"
-    )
-
     args = parser.parse_args()
 
     # Call pipeline with terminal arguments
     pipeline(to_include=args.to_include, 
              tune_hyperparameters=args.tune_hyperparameters,
-             epochs=args.epochs,
-             train_size=args.train_size)
+             epochs=args.epochs)
