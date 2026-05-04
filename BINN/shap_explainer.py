@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from pathlib import Path
+from datetime import datetime as dt
 
 def perform_shap(
         model: nn.Module, 
@@ -82,17 +83,23 @@ def perform_shap(
         feature_names=gene_names  
     )
 
+    now = dt.now().strftime("%y%m%d_%H%M")
+
     # generate the plots
     print("Displaying Beeswarm Plot...")
-    shap.plots.beeswarm(shap_explanation)
-    plt.savefig(figpath / 'beeswarm.png')
+    shap.plots.beeswarm(shap_explanation, show=False)
+    plt.savefig(figpath / f'beeswarm_{now}.png', bbox_inches='tight')
+    plt.close()
 
-    print("Displaying Waterfall Plot for Patient 0...")
-    shap.plots.waterfall(shap_explanation[0])
-    plt.savefig(figpath / 'waterfall.png')
+    for i in list(range(3)):
+        print(f"Displaying Waterfall Plot for Patient {i}...")
+        shap.plots.waterfall(shap_explanation[i], show=False)
+        plt.savefig(figpath / f'waterfall_{i}_{now}.png', bbox_inches='tight')
+        plt.close()
 
     print("Displaying Violin Plot...")
-    shap.plots.violin(shap_explanation)
-    plt.savefig(figpath / 'violin_plot.png')
+    shap.plots.violin(shap_explanation, show=False)
+    plt.savefig(figpath / f'violin_plot_{now}.png', bbox_inches='tight')
+    plt.close()
 
     print(f"Plots saved to: \n {figpath}")
