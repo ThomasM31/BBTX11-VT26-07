@@ -80,7 +80,7 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     cm = confusion_matrix(y_test, y_pred, normalize='true')
     cmap = plt.get_cmap('Blues')
     cmd = ConfusionMatrixDisplay(cm, display_labels=["Healthy", "AD"])
-    cmd.plot(cmap=cmap)#.figure_.savefig('confusion_matrix_SVM.png')
+    cmd.plot(cmap=cmap)
 
     plt.title("Confusion Matrix (SVM)")
     plt.savefig('confusion_matrix_SVM.png')
