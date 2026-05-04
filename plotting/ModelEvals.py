@@ -16,15 +16,15 @@ rng = np.random.default_rng(RANDOM_SEED)
 
 # Load BINN results:
 def load_binn_scores(): 
-    if os.path.exists("binn_test_results.csv"):
-        df = pd.read_csv("binn_test_results.csv")
+    if os.path.exists("plotting/ModelResults/binn_test_results.csv"):
+        df = pd.read_csv("plotting/ModelResults/binn_test_results.csv") 
         return df['y_true'].values, df['y_prob'].values
     return None, None
 
 # Load SVM results:
 def load_svm_scores(cell_type):
-    if os.path.exists("svm_test_results.csv"):
-        df = pd.read_csv("svm_test_results.csv")
+    if os.path.exists("plotting/ModelResults/svm_test_results.csv"):
+        df = pd.read_csv("plotting/ModelResults/svm_test_results.csv")
         return df['y_true'].values, df['y_prob'].values
     else:
         print("Warning: svm_test_results.csv not found, using placeholder data.")
@@ -47,7 +47,7 @@ def get_bootstrap_roc(y_true, y_scores):
 
 def draw_roc(ax, binn_data, svm_data):
     # Plot the mean ROC-curve and 95% confidence interval
-    for label, (y_t, y_s), color in [("SVM (Actual)", svm_data, "steelblue"), ("BINN (Actual)", binn_data, "darkorange")]:
+    for label, (y_t, y_s), color in [("SVM", svm_data, "steelblue"), ("BINN", binn_data, "darkorange")]:
         fpr, m_tpr, ci, m_auc, s_auc = get_bootstrap_roc(y_t, y_s)
         ax.plot(fpr, m_tpr, color=color, label=f"{label} (AUC {m_auc:.2f}±{s_auc:.2f})")
         ax.fill_between(fpr, ci[0], ci[1], color=color, alpha=0.1)

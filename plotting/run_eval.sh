@@ -11,4 +11,4 @@
 source .venv/bin/activate
 
 # Execution (correct path to script):
-python3 Visualizations/ModelEvals.py
+python3 plotting/ModelEvals.py

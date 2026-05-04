@@ -699,7 +699,7 @@ def save_test_results(model, test_loader, device) -> pd.DataFrame:
                 all_probs.extend(probs.cpu().numpy().flatten())
 
     df_res = pd.DataFrame({'y_true': all_labels, 'y_prob': all_probs})
-    df_res.to_csv("binn_test_results.csv", index=False)
+    df_res.to_csv("plotting/ModelResults/binn_test_results.csv", index=False)
     print("Saved: binn_test_results.csv")
     return df_res
 
