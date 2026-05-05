@@ -7,6 +7,7 @@ import shap_explainer
 import pandas as pd
 from pathlib import Path
 import importlib.util
+import anndata as ad
 
 # import module for consistent paths
 path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
@@ -14,10 +15,20 @@ spec = importlib.util.spec_from_file_location("ppaths", path)
 ppaths = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ppaths)
 
+path = Path(__file__).resolve().parent.parent / "pipeline_paths_generalize.py"
+spec = importlib.util.spec_from_file_location("gpaths", path)
+gpaths = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gpaths)
+
 # PATHS
-pp = ppaths.PipelinePaths(True, 'mg_200_mc_200_mhvg1000')
-data_path = pp.compl_full_pipe_path
-mask_path = pp.mask_full_pipe_path
+# paths for train / test data
+ttpaths = ppaths.PipelinePaths(True, 'mg_200_mc_200_mhvg1000')
+tt_data_path = ttpaths.compl_full_pipe_path
+mask_path = ttpaths.mask_full_pipe_path
+
+# paths for generalizability data
+gen_paths = gpaths.PipelinePaths(True, 'mg_200_mc_200_mhvg1000')
+gen_data_path = ttpaths.compl_full_pipe_path
 
 # GLOBALS
 MASK_PATHS = [mask_path / f"oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
@@ -31,7 +42,7 @@ ACTIVATION_FN = nn.Tanh()
 
 def pipeline(to_include=list, 
              epochs=int, 
-             d_path=data_path, 
+             d_path=tt_data_path, 
              m_paths=MASK_PATHS,
              tune_hyperparameters=False):
     """
@@ -77,7 +88,7 @@ def pipeline(to_include=list,
     adata_global = dh.create_global_with_missing_patients(datasets_padded)
 
     print("Creating train/test split...")
-    train_subjects = pd.read_csv(pp.metadata_path / 'train_subjects.tsv')
+    train_subjects = pd.read_csv(ttpaths.metadata_path / 'train_subjects.tsv')
     train_adata, test_adata = ctts.predefined_subject_train_test_split(adata_global, train_subjects)
 
     print("Getting dataloaders...")
@@ -102,7 +113,26 @@ def pipeline(to_include=list,
     X_train_tensor = torch.tensor(train_adata.X.toarray(), dtype=torch.float32).to(device)
     X_test_tensor = torch.tensor(test_adata.X.toarray(), dtype=torch.float32).to(device)
     gene_names = masks['df0'].index.tolist()
-    shap_explainer.perform_shap(model, X_train_tensor, X_test_tensor, gene_names, pp.figures_path_shap)
+    shap_explainer.perform_shap(model, X_train_tensor, X_test_tensor, gene_names, ttpaths.figures_path_shap)
+
+    # generalizability data
+    gen_adata = ad.read_h5ad(gen_paths.compl_full_pipe_path / 'all.h5ad')
+    gen_datasets = {'all' : gen_adata}
+    
+    gen_datasets = dh.rollup_generalizability_data(gen_datasets)
+
+    gen_datasets_aligned = dh.subset_genes(gen_datasets, masks['df0'])
+
+    gen_datasets_padded = dh.pad_align_data(gen_datasets_aligned, masks['df0'])
+    
+    gen_adata_global = dh.create_global_from_gen_data(gen_datasets_padded['all'])
+
+    gen_loader = dh.create_generalizability_dataloader(gen_adata_global['all'], BATCH_SIZE)
+    
+    # test the model with the generalizability data 
+    gen_loss, gen_acc = dh.generalizability_test(model, gen_loader, criterion, device)
+
+    print(f"Generalizability Test - Loss: {gen_loss:.4f}, Accuracy: {gen_acc:.4f}")
 
     print("Pipeline completed!")
 

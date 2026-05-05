@@ -1,3 +1,16 @@
+import os
+import sys
+from pathlib import Path
+from datetime import datetime as dt
+
+print("--- DEBUG INFO ---")
+print(f"Current File: {__file__}")
+print(f"Current Working Directory: {os.getcwd()}")
+print("Python Path:")
+for p in sys.path:
+    print(f"  {p}")
+print("------------------")
+
 # Own files
 import optuna
 from binn import BINN
@@ -15,17 +28,26 @@ import scanpy as sc
 from sklearn.model_selection import StratifiedKFold
 import scipy
 from sklearn.preprocessing import StandardScaler
+from pathlib import Path
+import importlib.util
 
-# TESTING
-base_path = "/data/shared/alzgene26/data"
-data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
+# import module for consistent paths
+path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
+spec = importlib.util.spec_from_file_location("ppaths", path)
+ppaths = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ppaths)
+
+# PATHS
+pp = ppaths.PipelinePaths(True, 'mg_200_mc_200_mhvg1000')
+data_path = pp.compl_full_pipe_path
+mask_path = pp.mask_full_pipe_path
 
 # GLOBALS
+MASK_PATHS = [mask_path / f"oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+            for i in range(5)]
 EPOCHS = 40
 TRAIN_SIZE = 0.8
 ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
-            for i in range(5)]
 
 
 def data_concatenate(acollection : AnnCollection):
@@ -77,6 +99,10 @@ def create_dataloaders(train_adata: ad.AnnData,
     train_loader = AnnLoader(train_adata, batch_size=batch_size, shuffle=True)
     test_loader = AnnLoader(test_adata, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
+
+def create_generalizability_dataloader(adata: ad.AnnData, batch_size: int) -> AnnLoader:
+    data_loader = AnnLoader(adata, batch_size=batch_size, shuffle=False)
+    return data_loader
 
 def save_data(datasets: dict, filepath: str) -> None:
     """
@@ -302,6 +328,18 @@ def create_global_with_missing_patients(datasets_dict: dict) -> dict:
     print(f"Done! Final Global shape: {global_adata.shape}")
     return global_adata
 
+def create_global_from_gen_data(gen_adata: ad.AnnData) -> dict:
+    """
+    Prepares generalizability data for the dataloader by ensuring 
+    the index is set to subjects and wrapping in a dictionary.
+    """
+    # Use 'subject' as the index for consistency with the global pipeline
+    if 'subject' in gen_adata.obs.columns:
+        gen_adata.obs.index = gen_adata.obs['subject'].astype(str)
+    
+    # In the absence of cell types, we treat the dataset as a single 'all' group
+    return {'all': gen_adata}
+
 def scaling_no_leakage(train_adata: ad.AnnData, test_adata: ad.AnnData) -> tuple[ad.AnnData, ad.AnnData]:
     """
     Scaling after train test split to minimize leakage
@@ -370,6 +408,12 @@ def rollup_to_patient_level(datasets: dict) -> dict:
         patient_level_datasets[label] = patient_pseudo
         
     return patient_level_datasets
+
+def rollup_generalizability_data(datasets: dict) -> dict:
+    for label, adata in datasets.items():
+        adata.X = csr_matrix(adata.X)
+        datasets[label] = adata
+    return datasets
 
 def poison_scanner(dataloader: AnnLoader, device) -> None:
     """
@@ -476,6 +520,21 @@ def training_loop(model: BINN,
         history['test_acc'].append(test_acc)
     
     return history
+
+def generalizability_test(model: BINN, 
+                          gen_loader: AnnLoader, 
+                          criterion, 
+                          device) -> tuple:
+    
+    # Run the test loop
+    gen_loss, gen_acc = bt.test_one_epoch(
+        model=model, 
+        test_loader=gen_loader, 
+        criterion=criterion, 
+        device=device
+    )
+
+    return (gen_loss, gen_acc)
 
 def find_dead_outputs(model, mask_matrix_list):
     """
@@ -699,7 +758,9 @@ def save_test_results(model, test_loader, device) -> pd.DataFrame:
                 all_probs.extend(probs.cpu().numpy().flatten())
 
     df_res = pd.DataFrame({'y_true': all_labels, 'y_prob': all_probs})
-    df_res.to_csv("plotting/ModelResults/binn_test_results.csv", index=False)
+    
+    now = dt.now().strftime("%y%m%d_%H%M")
+    df_res.to_csv(pp.binn_test_results_path / f'binn_test_results_{now}.csv', index=False)
     print("Saved: binn_test_results.csv")
     return df_res
 
