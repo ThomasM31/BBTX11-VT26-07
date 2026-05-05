@@ -4,11 +4,13 @@ from sklearn.svm import SVC
 from sklearn.decomposition import PCA
 from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, roc_auc_score, roc_curve, accuracy_score
+from sklearn.metrics import classification_report, roc_auc_score, roc_curve, accuracy_score, confusion_matrix, ConfusionMatrixDisplay
 import BINN.data_handling as dh
 import BINN.custom_train_test_split as ctts
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
+import numpy as np
 
 # anndata
 import anndata as ad
@@ -71,7 +73,18 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
 
     # Accuracy 
     acc = accuracy_score(y_test, y_pred)
-    print(f"Accuracy for svm: {acc}")
+    print(f"accuracy for svm: {acc}")
+
+    # Confusion Matrix
+    print("Saving confusion matrix..")
+    cm = confusion_matrix(y_test, y_pred, normalize='true')
+    cmap = plt.get_cmap('Blues')
+    cmd = ConfusionMatrixDisplay(cm, display_labels=["Healthy", "AD"])
+    cmd.plot(cmap=cmap)
+
+    plt.title("Confusion Matrix (SVM)")
+    plt.savefig('confusion_matrix_SVM.png')
+    plt.close()
 
     print(classification_report(y_test, y_pred))
 

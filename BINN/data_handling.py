@@ -18,7 +18,7 @@ import binn_training as bt
 
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
 import os
 import pandas as pd, numpy as np
 from scipy.sparse import csr_matrix
@@ -28,6 +28,7 @@ import scanpy as sc
 from sklearn.model_selection import StratifiedKFold
 import scipy
 from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 from pathlib import Path
 import importlib.util
 
@@ -590,10 +591,13 @@ def evaluate_model_roc(model, test_loader: AnnLoader, device) -> tuple[np.array,
             
             logits = model(inputs)
             # Apply sigmoid to get probabilities [0, 1]
-            probs = torch.sigmoid(logits).cpu().numpy()
+            probs = torch.sigmoid(logits)
+            
+            # all_probs.extend(probs)
+            # all_labels.extend(labels)
 
             all_labels.extend(labels.cpu().numpy())
-            all_probs.extend(probs)
+            all_probs.extend(probs.cpu().numpy())
             
     # fetch probabilites and target labels
     probs, targets = np.array(all_probs).flatten(), np.array(all_labels).flatten()
@@ -764,3 +768,22 @@ def save_test_results(model, test_loader, device) -> pd.DataFrame:
     print("Saved: binn_test_results.csv")
     return df_res
 
+def confusion_matrix_binn(df_res: pd.DataFrame) -> None:
+    """
+    Confusion matrix plotting function for BINN 
+    """
+    y_test = df_res["y_true"]
+    # Convert probs to predictions
+    df_res['y_pred'] = (df_res['y_prob'] > 0.5).astype(int)
+    y_pred = df_res["y_pred"]
+
+    # Confusion matrix 
+    cm = confusion_matrix(y_test, y_pred, normalize='true')
+    cmap = plt.get_cmap('Blues')
+    cmd = ConfusionMatrixDisplay(cm, display_labels=["Healthy", "AD"])
+    cmd.plot(cmap=cmap)
+
+    plt.title("Confusion Matrix (BINN)")
+    plt.savefig('confusion_matrix_BINN.png')
+    plt.show()
+    plt.close()
