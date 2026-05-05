@@ -69,5 +69,11 @@ class PipelinePaths:
 
         self.extra_test_path = data_path / processed_data/ "test_path"
 
+        # RESULTS
+        self.results_path = data_path / 'results'
+        self.binn_test_results_path = self.results_path / 'binn_results' 
+        self.svm_results_path = self.results_path / 'svm_results'
+        self.shap_results_path = self.results_path / 'shap_data'
+
         # for every path, creates path if it does not exist
         self._ensure_paths_exist()
