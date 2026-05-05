@@ -1,6 +1,5 @@
 import scanpy as sc
 from pathlib import Path
-import anndata as ad
 
 def draw_umap(adata, 
               label: str, 
