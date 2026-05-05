@@ -5,53 +5,34 @@ import sys
 
 from pathlib import Path
 import importlib.util
-
+import anndata as ad
 
 def pipeline(
         to_include: list,
         proc_dir: Path,
-        shared_dir_mode: bool,
-        train_test_mode: bool
+        shared_dir_mode: bool
         ) -> None:
     
-    # import module for consistent paths
-    if train_test_mode:
-        path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
-        from preprocessing import preprocess as pre
-    else:
-        path = Path(__file__).resolve().parent.parent / "pipeline_paths_generalize.py"
+    path = Path(__file__).resolve().parent.parent / "pipeline_paths_generalize.py"
     spec = importlib.util.spec_from_file_location("ppaths", path)
     ppaths = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(ppaths)   
+    spec.loader.exec_module(ppaths)
+   
     
     pp = ppaths.PipelinePaths(shared_dir_mode)
     save_path = pp.figures_path / proc_dir
     save_path.mkdir(parents=True, exist_ok=True)
 
-    print(f'Initialize draw UMAPs \n Path is {pp.data_path}')
-    
-    if train_test_mode:
-        # from int to readable labels
-        included_labels = pre.get_labels(to_include)
-        label = included_labels[0]
-        # create empty dict
-        datasets_processed = pre.get_datasets(included_labels)
-        # read h5ad files, add to datasets dict
-        pre.read_intermediate(datasets_processed, pp.compl_base / proc_dir)
-        proc_dataset = datasets_processed[label]
-    else:
-        label = 'all'
-        datasets_processed = {label : None}
-        pre.read_intermediate(datasets_processed, pp.compl_base / proc_dir)
-        proc_dataset = datasets_processed[label]
-
+    label = 'all'
+    proc_dataset = ad.read_h5ad(pp.compl_base / proc_dir / f'{label}.h5ad')
     print(proc_dataset)
-
-    color_by = 'cell_type_high_resolution'
-    umaps.draw_umap(proc_dataset, label, save_path, 'processed', color_by)
-
-    color_by = 'AD_status'
     umaps.draw_umap(proc_dataset, label, save_path, 'processed', 'AD_status')
+    
+    label = 'GSE157827_merged'
+    orig_dataset = ad.read_h5ad(pp.conv_data_path / f'{label}.h5ad')
+    print(orig_dataset)
+    label = 'all'
+    umaps.draw_umap(orig_dataset, label, save_path, 'original', 'AD_status')
 
     print('Pipeline completed')
 
@@ -82,24 +63,14 @@ if __name__ == "__main__":
         help="Directory to work in: shared = True, user = False. Default is True."
     )
 
-    # Optional argument
-    parser.add_argument(
-        "--train_test_mode", 
-        type=bool,
-        default=True,
-        help="To run on data from train test pipeline (True, default) or generalizability data (False)"
-    )
-
     args = parser.parse_args()
 
     to_include = args.to_include
     proc_dir = args.proc_dir
     shared_dir_mode = args.shared_dir_mode
-    train_test_mode = args.train_test_mode
 
     pipeline(
         to_include,
         proc_dir,
-        shared_dir_mode,
-        train_test_mode
+        shared_dir_mode
         )
