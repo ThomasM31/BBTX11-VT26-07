@@ -46,6 +46,7 @@ def read_files(datasets: dict, filepath: Path) -> dict:
 
     return datasets
 
+
 def read_intermediate(datasets: dict, filepath: Path) -> None:
     '''
     To read files saved at any stage of processing ('label.h5ad').
@@ -339,11 +340,18 @@ def pseudobulk(datasets: dict[str, ad.AnnData],
 
         source = adata.uns[layer_key] if layer_key else adata
 
-        pseudo = sc.get.aggregate(
-            source, 
-            by=['subject', 'cell_type_high_resolution'], 
-            func=bulk_by
-            )
+        if 'cell_type_high_resolution' in adata.obs.columns:  
+            pseudo = sc.get.aggregate(
+                source, 
+                by=['subject', 'cell_type_high_resolution'], 
+                func=bulk_by
+                )
+        else:
+            pseudo = sc.get.aggregate(
+                source, 
+                by=['subject'], 
+                func=bulk_by
+                )
 
         pseudo.X = pseudo.layers[bulk_by].copy()
         adata.uns['pseudo'] = pseudo 
