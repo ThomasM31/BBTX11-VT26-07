@@ -26,6 +26,7 @@ def pipeline(
         ) -> None:
     
     run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{nr_common_hvgs}' 
+    op = ppaths.PipelinePaths(shared_dir_mode, full_pipeline_run_vars=run_vars)
     pp = ppaths.PipelinePaths(shared_dir_mode, full_pipeline_run_vars=run_vars)
         
     #-------START PROCESSING-------
@@ -33,6 +34,8 @@ def pipeline(
     included_labels = ['all']
     
     adata = ad.read_h5ad(pp.conv_data_path / 'GSE157827_merged.h5ad')
+    
+    # rename to be same as training data set
     adata.obs = adata.obs.rename(columns={'group': 'subject'})
     datasets = {'all': adata}
 
@@ -41,18 +44,14 @@ def pipeline(
 
     #-------PERFORM FILTERING-------
     
-    # The cell filtering doesn't actually remove anything from our dataset using
-    # the default values, therefore commented out
-
     # remove cells with less than 200 expressed genes
     pre.filter_cells_by_min_genes(datasets, min_genes=200)
     
     # remove cells with mito gene expression over threshold
     pre.filter_cells_by_mitochondrial_content(datasets)
 
-    # remove genes not in the final mask
-    astro_path = '/data/shared/alzgene26/data/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/astro.h5ad'
-    astro = ad.read_h5ad(astro_path)
+    # remove genes not in the final mask (same genes for all cell types, just pick one)
+    astro = ad.read_h5ad(op.compl_full_pipe_path / 'astro.h5ad')
 
     astro_genes = astro.var_names.tolist()
 
