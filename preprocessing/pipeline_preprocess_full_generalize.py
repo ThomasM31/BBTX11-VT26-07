@@ -6,10 +6,16 @@ import importlib.util
 import anndata as ad
 
 # import module for consistent paths
-path = Path(__file__).resolve().parent.parent / "pipeline_paths_generalize.py"
+path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
 spec = importlib.util.spec_from_file_location("ppaths", path)
 ppaths = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ppaths)
+
+# import module for consistent paths
+path = Path(__file__).resolve().parent.parent / "pipeline_paths_generalize.py"
+spec = importlib.util.spec_from_file_location("gpaths", path)
+gpaths = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gpaths)
 
 '''
 THE ACTUAL PREPROCESSING PIPELINE. USES DATA CREATED BY THE FIRST TWO PREP PIPELINES.
@@ -26,14 +32,17 @@ def pipeline(
         ) -> None:
     
     run_vars = f'mg_{min_genes}_mc_{min_cells}_mhvg{nr_common_hvgs}' 
-    op = ppaths.PipelinePaths(shared_dir_mode, full_pipeline_run_vars=run_vars)
-    pp = ppaths.PipelinePaths(shared_dir_mode, full_pipeline_run_vars=run_vars)
+    
+    # path for train/test data
+    ttp = ppaths.PipelinePaths(shared_dir_mode, full_pipeline_run_vars=run_vars)
+    # path for generalizability data
+    gp = gpaths.PipelinePaths(shared_dir_mode, full_pipeline_run_vars=run_vars)
         
     #-------START PROCESSING-------
 
     included_labels = ['all']
     
-    adata = ad.read_h5ad(pp.conv_data_path / 'GSE157827_merged.h5ad')
+    adata = ad.read_h5ad(gp.conv_data_path / 'GSE157827_merged.h5ad')
     
     # rename to be same as training data set
     adata.obs = adata.obs.rename(columns={'group': 'subject'})
@@ -51,7 +60,7 @@ def pipeline(
     pre.filter_cells_by_mitochondrial_content(datasets)
 
     # remove genes not in the final mask (same genes for all cell types, just pick one)
-    astro = ad.read_h5ad(op.compl_full_pipe_path / 'astro.h5ad')
+    astro = ad.read_h5ad(ttp.compl_full_pipe_path / 'astro.h5ad')
 
     astro_genes = astro.var_names.tolist()
 
@@ -76,12 +85,13 @@ def pipeline(
     #-------ADD METADATA-------
 
     # add disease status
+    adata = datasets['all']
     adata.obs['AD_status'] = adata.obs['subject'].str.startswith('AD').astype(int)
     datasets['all'] = adata
 
     print(adata)
 
-    pre.save_files(datasets, pp.compl_full_pipe_path, 'completed')
+    pre.save_files(datasets, gp.compl_full_pipe_path, 'completed')
 
     print('Pipeline completed')
 
