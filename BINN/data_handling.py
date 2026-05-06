@@ -18,7 +18,7 @@ import binn_training as bt
 
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
-from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, f1_score
 import os
 import pandas as pd, numpy as np
 from scipy.sparse import csr_matrix
@@ -793,3 +793,16 @@ def confusion_matrix_binn(df_res: pd.DataFrame) -> None:
     plt.savefig('confusion_matrix_BINN.png')
     plt.show()
     plt.close()
+
+def f1_calculator(df_res: pd.DataFrame) -> float:
+    """
+    Calculates F1-score for the input data
+    """
+    y_test = df_res["y_true"]
+    # Convert probs to predictions
+    df_res['y_pred'] = (df_res['y_prob'] > 0.5).astype(int)
+    y_pred = df_res["y_pred"]
+
+    score =  f1_score(y_test, y_pred)
+    print(f"F1-score for BINN: {score}")
+    return score

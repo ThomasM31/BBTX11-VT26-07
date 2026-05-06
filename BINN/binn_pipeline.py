@@ -99,10 +99,13 @@ def pipeline(to_include=list,
 
     print("Fetching metrics...")
     metrics = dh.fetch_best_metrics(history)
-    print(f"best BINN metrics: {metrics}")
+    print(f"BINN Metrics: {metrics}")
 
     print("Generating and saving test predictions for visualization...")
     df_res = dh.save_test_results(model, test_loader, device)
+
+    print("Calculating F1-score...")
+    score = dh.f1_calculator(df_res)
 
     if tune_hyperparameters:
         best_params = dh.hyperparameter_tuning_optuna(adata_global, in_features, layers_list, tensor_masks, 
