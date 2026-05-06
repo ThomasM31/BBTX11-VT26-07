@@ -98,7 +98,8 @@ def pipeline(to_include=list,
     history = dh.training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, epochs)
 
     print("Fetching metrics...")
-    best_train_acc_i, best_test_acc_i, best_train_loss_i, best_test_loss_i = dh.fetch_best_metrics(history)
+    metrics = dh.fetch_best_metrics(history)
+    print(f"best BINN metrics: {metrics}")
 
     print("Generating and saving test predictions for visualization...")
     df_res = dh.save_test_results(model, test_loader, device)

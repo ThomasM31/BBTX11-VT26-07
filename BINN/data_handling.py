@@ -607,29 +607,35 @@ def evaluate_model_roc(model, test_loader: AnnLoader, device) -> tuple[np.array,
 
     return probs, targets, auc_score
 
-def fetch_best_metrics(history:list) -> tuple[float,float,float,float]:
+def fetch_best_metrics(history:list) -> dict:
     """
     Best metrics from Training & Testing
     Args:
         history(list): list of train losses, train accuracies, test losses, test accuracies over epochs
     """
+    best_metrics = {}
+
     # Fetch best values & indexes
     best_train_acc = max(history["train_acc"])
     best_train_acc_i = np.argmax(history["train_acc"])
+    best_metrics.update({"best_train_acc": best_train_acc})
 
     best_test_acc = max(history["test_acc"])
     best_test_acc_i = np.argmax(history["test_acc"])
+    best_metrics.update({"best_test_acc": best_test_acc})
 
     best_train_loss = min(history["train_loss"]) 
     best_train_loss_i = np.argmin(history["train_loss"])
+    best_metrics.update({"best_train_loss": best_train_loss})
 
     best_test_loss = min(history["test_loss"]) 
     best_test_loss_i = np.argmin(history["test_loss"])
+    best_metrics.update({"best_test_loss": best_test_loss})
 
     print(f"Best train Loss: {best_train_loss:.4f} found at epoch {best_train_loss_i} | Best train acc: {best_train_acc:.4f} found at epoch {best_train_acc_i} || "
                 f"Best test Loss: {best_test_loss:.4f} found at epoch {best_test_loss_i} | Best test acc: {best_test_acc:.4f} found at epoch {best_test_acc_i}")
     
-    return best_train_acc_i, best_test_acc_i, best_train_loss_i, best_test_loss_i
+    return best_metrics
 
 def run_cross_validation(adata, 
                         in_features:int, 
