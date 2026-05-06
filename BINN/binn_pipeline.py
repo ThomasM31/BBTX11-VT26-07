@@ -104,8 +104,8 @@ def pipeline(to_include=list,
     print("Generating and saving test predictions for visualization...")
     df_res = dh.save_test_results(model, test_loader, device)
 
-    print("Calculating F1-score...")
-    score = dh.f1_calculator(df_res)
+    print("Calculating classification report...")
+    report = dh.class_report(df_res)
 
     if tune_hyperparameters:
         best_params = dh.hyperparameter_tuning_optuna(adata_global, in_features, layers_list, tensor_masks, 
