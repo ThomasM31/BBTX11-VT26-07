@@ -7,8 +7,8 @@
 #SBATCH --time=00:30:00
 #SBATCH --output=slurm_%j.out
 
-# Environment (activation):
+# Environment:
 source .venv/bin/activate
 
-# Execution (correct path to script):
-python3 plotting/HierarcClustering.py
+# Execution:
+python3 -u plotting/HierarcClustering.py
