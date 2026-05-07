@@ -18,7 +18,7 @@ import binn_training as bt
 
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
-from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, classification_report
 import os
 import pandas as pd, numpy as np
 from scipy.sparse import csr_matrix
@@ -607,29 +607,35 @@ def evaluate_model_roc(model, test_loader: AnnLoader, device) -> tuple[np.array,
 
     return probs, targets, auc_score
 
-def fetch_best_metrics(history:list) -> tuple[float,float,float,float]:
+def fetch_best_metrics(history:list) -> dict:
     """
     Best metrics from Training & Testing
     Args:
         history(list): list of train losses, train accuracies, test losses, test accuracies over epochs
     """
+    best_metrics = {}
+
     # Fetch best values & indexes
     best_train_acc = max(history["train_acc"])
     best_train_acc_i = np.argmax(history["train_acc"])
+    best_metrics.update({"best_train_acc": best_train_acc})
 
     best_test_acc = max(history["test_acc"])
     best_test_acc_i = np.argmax(history["test_acc"])
+    best_metrics.update({"best_test_acc": best_test_acc})
 
     best_train_loss = min(history["train_loss"]) 
     best_train_loss_i = np.argmin(history["train_loss"])
+    best_metrics.update({"best_train_loss": best_train_loss})
 
     best_test_loss = min(history["test_loss"]) 
     best_test_loss_i = np.argmin(history["test_loss"])
+    best_metrics.update({"best_test_loss": best_test_loss})
 
     print(f"Best train Loss: {best_train_loss:.4f} found at epoch {best_train_loss_i} | Best train acc: {best_train_acc:.4f} found at epoch {best_train_acc_i} || "
                 f"Best test Loss: {best_test_loss:.4f} found at epoch {best_test_loss_i} | Best test acc: {best_test_acc:.4f} found at epoch {best_test_acc_i}")
     
-    return best_train_acc_i, best_test_acc_i, best_train_loss_i, best_test_loss_i
+    return best_metrics
 
 def run_cross_validation(adata, 
                         in_features:int, 
@@ -787,3 +793,16 @@ def confusion_matrix_binn(df_res: pd.DataFrame) -> None:
     plt.savefig('confusion_matrix_BINN.png')
     plt.show()
     plt.close()
+
+def class_report(df_res: pd.DataFrame) -> str:
+    """
+    Calculates a classification report for the input data
+    """
+    y_test = df_res["y_true"]
+    # Convert probs to predictions
+    df_res['y_pred'] = (df_res['y_prob'] > 0.5).astype(int)
+    y_pred = df_res["y_pred"]
+
+    report =  classification_report(y_test, y_pred)
+    print(f"Classification report for BINN: {report}")
+    return report

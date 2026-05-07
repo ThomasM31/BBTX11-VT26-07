@@ -12,9 +12,7 @@ def perform_shap(
         X_train_tensor: torch.Tensor, 
         X_test_tensor: torch.Tensor,
         gene_names: list[str],
-        figpath: Path,
-        stage: str,
-        date: str
+        figpath: Path
         ) -> None:
     
     device = next(model.parameters()).device
@@ -85,21 +83,34 @@ def perform_shap(
         feature_names=gene_names  
     )
 
+    now = dt.now().strftime("%y%m%d_%H%M")
+
+
+    # Save rawdata for figures:
+    # E.g. the SHAP-matrix (importance for each gene per patient)
+    shap_df = pd.DataFrame(shap_matrix, columns=gene_names)
+    shap_df.to_csv(figpath / f'real_shap_values.csv', index=False)
+    raw_expr_df = pd.DataFrame(test_patients.cpu().numpy(), columns=gene_names)
+    raw_expr_df.to_csv(figpath / f'real_expression_values.csv', index=False)
+    
+    print(f"Data saved to CSV in: {figpath}")
+
+
     # generate the plots
     print("Displaying Beeswarm Plot...")
-    shap.plots.beeswarm(shap_explanation, show=False, max_display=11)
-    plt.savefig(figpath / f'beeswarm_{stage}_{date}.png', bbox_inches='tight')
+    shap.plots.beeswarm(shap_explanation, show=False)
+    plt.savefig(figpath / f'beeswarm_{now}.png', bbox_inches='tight')
     plt.close()
 
     for i in list(range(3)):
         print(f"Displaying Waterfall Plot for Patient {i}...")
-        shap.plots.waterfall(shap_explanation[i], show=False, max_display=11)
-        plt.savefig(figpath / f'waterfall_{stage}_{date}_{i}.png', bbox_inches='tight')
+        shap.plots.waterfall(shap_explanation[i], show=False)
+        plt.savefig(figpath / f'waterfall_{i}_{now}.png', bbox_inches='tight')
         plt.close()
 
     print("Displaying Violin Plot...")
-    shap.plots.violin(shap_explanation, show=False, max_display=11)
-    plt.savefig(figpath / f'violin_plot_{stage}_{date}.png', bbox_inches='tight')
+    shap.plots.violin(shap_explanation, show=False)
+    plt.savefig(figpath / f'violin_plot_{now}.png', bbox_inches='tight')
     plt.close()
 
     print(f"Plots saved to: \n {figpath}")
