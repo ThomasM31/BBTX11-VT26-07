@@ -91,12 +91,11 @@ def perform_shap(
     # Save rawdata for figures:
     # E.g. the SHAP-matrix (importance for each gene per patient)
     shap_df = pd.DataFrame(shap_matrix, columns=gene_names)
-    shap_df.to_csv(figpath / f'real_shap_values.csv', index=False)
+    shap_df.to_csv(figpath / f'real_shap_values_{date}.csv', index=False)
     raw_expr_df = pd.DataFrame(test_patients.cpu().numpy(), columns=gene_names)
-    raw_expr_df.to_csv(figpath / f'real_expression_values.csv', index=False)
+    raw_expr_df.to_csv(figpath / f'real_expression_values_{date}.csv', index=False)
     
     print(f"Data saved to CSV in: {figpath}")
-
 
     # generate the plots
     print("Displaying Beeswarm Plot...")
