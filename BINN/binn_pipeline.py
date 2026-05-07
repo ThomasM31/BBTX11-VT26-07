@@ -8,6 +8,7 @@ import pandas as pd
 from pathlib import Path
 import importlib.util
 import anndata as ad
+from datetime import datetime as dt
 
 # import module for consistent paths
 path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
@@ -109,13 +110,16 @@ def pipeline(to_include=list,
                                                 k=5, epochs=epochs)
         print(f"Best parameters for BINN: {best_params}")
     
-    print("Perform SHAP analysis...")
+    # save data for SHAP
+    now = dt.now().strftime("%y%m%d_%H%M")
     X_train_tensor = torch.tensor(train_adata.X.toarray(), dtype=torch.float32).to(device)
     X_test_tensor = torch.tensor(test_adata.X.toarray(), dtype=torch.float32).to(device)
-    gene_names = masks['df0'].index.tolist()
-    shap_explainer.perform_shap(model, X_train_tensor, X_test_tensor, gene_names, ttpaths.figures_path_shap)
+    
+    torch.save(model.state_dict(), ttpaths.binn_model_path / f"binn_model_{now}.pth")
+    torch.save(X_train_tensor.cpu(), ttpaths.binn_model_path / f"X_train_tensor_{now}.pt")
+    torch.save(X_test_tensor.cpu(), ttpaths.binn_model_path / f"X_test_tensor_{now}.pt")
 
-    # generalizability data
+    print('Testing generalizability of model...')
     gen_adata = ad.read_h5ad(gen_paths.compl_full_pipe_path / 'all.h5ad')
     gen_datasets = {'all' : gen_adata}
     
@@ -133,6 +137,10 @@ def pipeline(to_include=list,
     gen_loss, gen_acc = dh.generalizability_test(model, gen_loader, criterion, device)
 
     print(f"Generalizability Test - Loss: {gen_loss:.4f}, Accuracy: {gen_acc:.4f}")
+
+    # Convert to tensor and save
+    X_gen_tensor = torch.tensor(gen_adata_global['all'].X.toarray(), dtype=torch.float32).to(device)
+    torch.save(X_gen_tensor.cpu(), ttpaths.binn_model_path / f"X_gen_tensor_{now}.pt")
 
     print("Pipeline completed!")
 
