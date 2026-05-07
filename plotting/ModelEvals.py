@@ -53,9 +53,9 @@ def draw_roc(ax, binn_data, svm_data):
         ax.fill_between(fpr, ci[0], ci[1], color=color, alpha=0.1)
     
     ax.plot([0, 1], [0, 1], "k--", lw=0.5)
-    ax.set_title("ROC Curve: Global Evaluation")
-    ax.set_xlabel("1 - Specificity")
-    ax.set_ylabel("Sensitivity")
+    ax.set_title("ROC-kurva: Global evaluering")
+    ax.set_xlabel("1 - specificitet")
+    ax.set_ylabel("Sensitivitet")
     ax.legend(fontsize=8)
 
 def draw_confusion(ax, y_t, y_s):
@@ -69,11 +69,11 @@ def draw_confusion(ax, y_t, y_s):
             color = "white" if cm[i,j] > 0.5 else "black"
             ax.text(j, i, f"{cm[i,j]:.2f}", ha="center", va="center", color=color)
             
-    ax.set_title("Normalized Confusion Matrix: BINN")
-    ax.set_xticks([0, 1], ["Healthy", "AD"])
-    ax.set_yticks([0, 1], ["Healthy", "AD"])
-    ax.set_xlabel("Predicted Label")
-    ax.set_ylabel("True Label")
+    ax.set_title("Normaliserad förväxlingsmatris: BINN")
+    ax.set_xticks([0, 1], ["Frisk", "AD"])
+    ax.set_yticks([0, 1], ["Frisk", "AD"])
+    ax.set_xlabel("Förutspådd etikett")
+    ax.set_ylabel("Sann etikett")
 
 def run_evaluation():
     # Orchestrate the loading and plotting process
@@ -89,7 +89,7 @@ def run_evaluation():
         draw_confusion(axes[1], y_t_binn, y_s_binn)
         
         plt.tight_layout()
-        save_path = os.path.join(SAVE_DIR, "global_binn_evaluation.png")
+        save_path = os.path.join(SAVE_DIR, "global_binn_evaluation_swe.png")
         plt.savefig(save_path, dpi=300)
         print(f"Evaluation complete. Figure saved to: {save_path}")
     else:
