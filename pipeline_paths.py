@@ -71,7 +71,8 @@ class PipelinePaths:
 
         # RESULTS
         self.results_path = data_path / 'results'
-        self.binn_test_results_path = self.results_path / 'binn_results' 
+        self.binn_test_results_path = self.results_path / 'binn_results'
+        self.binn_model_path = self.results_path / 'binn_model' 
         self.svm_results_path = self.results_path / 'svm_results'
         self.shap_results_path = self.results_path / 'shap_data'
 
