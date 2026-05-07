@@ -12,4 +12,4 @@ cd /data/users/lucasant/kandidatarbete/BBTX11-VT26-07
 source .venv/bin/activate
 
 # Execution (correct path to script):
-python3 Visualizations/ComprehensiveModelEval.py
+python3 plotting/ComprehensiveModelEval.py
