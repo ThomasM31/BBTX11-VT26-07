@@ -12,7 +12,9 @@ def perform_shap(
         X_train_tensor: torch.Tensor, 
         X_test_tensor: torch.Tensor,
         gene_names: list[str],
-        figpath: Path
+        figpath: Path,
+        stage: str,
+        date: str
         ) -> None:
     
     device = next(model.parameters()).device
@@ -98,19 +100,19 @@ def perform_shap(
 
     # generate the plots
     print("Displaying Beeswarm Plot...")
-    shap.plots.beeswarm(shap_explanation, show=False)
-    plt.savefig(figpath / f'beeswarm_{now}.png', bbox_inches='tight')
+    shap.plots.beeswarm(shap_explanation, show=False, max_display=11)
+    plt.savefig(figpath / f'beeswarm_{stage}_{date}.png', bbox_inches='tight')
     plt.close()
 
     for i in list(range(3)):
         print(f"Displaying Waterfall Plot for Patient {i}...")
-        shap.plots.waterfall(shap_explanation[i], show=False)
-        plt.savefig(figpath / f'waterfall_{i}_{now}.png', bbox_inches='tight')
+        shap.plots.waterfall(shap_explanation[i], show=False, max_display=11)
+        plt.savefig(figpath / f'waterfall_{stage}_{date}_{i}.png', bbox_inches='tight')
         plt.close()
 
     print("Displaying Violin Plot...")
-    shap.plots.violin(shap_explanation, show=False)
-    plt.savefig(figpath / f'violin_plot_{now}.png', bbox_inches='tight')
+    shap.plots.violin(shap_explanation, show=False, max_display=11)
+    plt.savefig(figpath / f'violin_plot_{stage}_{date}.png', bbox_inches='tight')
     plt.close()
 
     print(f"Plots saved to: \n {figpath}")
