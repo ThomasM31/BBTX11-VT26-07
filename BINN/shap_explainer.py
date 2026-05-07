@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from pathlib import Path
 from datetime import datetime as dt
+import torch.nn.functional as F
 
 def perform_shap(
         model: nn.Module, 
@@ -115,3 +116,76 @@ def perform_shap(
     plt.close()
 
     print(f"Plots saved to: \n {figpath}")
+
+
+def layerwise_shap(model, X_train_tensor, X_test_tensor, masks, device):
+    model.eval()
+    all_edges = []
+    
+    # We use X_test to determine the 'flow' for the Sankey
+    # We need to track gradients on the input to flow them through the hidden layers
+    x = X_test_tensor.clone().detach().to(device).requires_grad_(True)
+
+    # Forward Pass with Activation Tracking
+    # We store the activations and enable gradient tracking on them
+    activations = []
+    
+    current_x = x
+    for i, layer in enumerate(model.model_layers):
+        # We need to capture the state of x BEFORE it enters the next layer
+        # because these nodes are the "Sources" for this mask
+        act = current_x.detach().clone().requires_grad_(True)
+        act.retain_grad() 
+        activations.append(act)
+
+        # Replicate your model's forward logic
+        mask = getattr(model, f'mask_{i}')
+        if mask.shape != layer.weight.shape:
+            masked_weight = layer.weight * mask.t()
+        else:
+            masked_weight = layer.weight * mask
+
+        current_x = F.linear(act, masked_weight, layer.bias)
+        
+        if i < len(model.model_layers) - 1:
+            current_x = model.layer_norms[i](current_x)
+            current_x = model.activation_fn(current_x)
+            current_x = model.dropout(current_x)
+
+    # Calculate gradients of the output with respect to all captured activations
+    model.zero_grad()
+    # If binary classification output is (Patients, 1), we sum to get a scalar for backward
+    current_x.sum().backward()
+
+    # Calculate Connection Importance
+    for i in range(len(masks)):
+        mask_key = f'df{i}'
+        current_mask = masks[mask_key]
+        sources = current_mask.index.tolist()
+        targets = current_mask.columns.tolist()
+
+        # Importance = Activation * Gradient (averaged across patients)
+        act = activations[i]
+        if act.grad is not None:
+            # mean absolute value across the batch
+            importance_scores = (act * act.grad).abs().mean(dim=0).cpu().detach().numpy()
+        else:
+            importance_scores = np.zeros(len(sources))
+
+        # Map to Sankey DataFrame
+        for s_idx, source_name in enumerate(sources):
+            weight = importance_scores[s_idx]
+            
+            # Find which targets this source actually connects to in this mask
+            # row s_idx, columns where mask != 0
+            active_targets_mask = current_mask.iloc[s_idx] != 0
+            active_target_names = current_mask.columns[active_targets_mask].tolist()
+            
+            for target_name in active_target_names:
+                all_edges.append({
+                    'Source': source_name,
+                    'Target': target_name,
+                    'SHAP_Weight': float(weight)
+                })
+
+    return pd.DataFrame(all_edges)
