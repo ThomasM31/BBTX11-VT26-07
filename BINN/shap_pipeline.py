@@ -81,9 +81,9 @@ def pipeline(date: str,
     model.load_state_dict(torch.load(model_file, map_location=device))
     model.eval() # Set to evaluation mode for SHAP
 
-    print("Runnning shap for original data set & generalizability data set")
+    print("Runnning shap for ROSMAP data set & generalizability data set")
     gene_names = masks['df0'].index.tolist()
-    shap_explanation = shap_explainer.perform_shap(model, X_train_tensor, X_test_tensor, gene_names, ttpaths.figures_path_shap, 'train-test', date)
+    shap_explanation = shap_explainer.perform_shap(model, X_train_tensor, X_test_tensor, gene_names, ttpaths.figures_path_shap, 'ROSMAP', date)
 
     shap_explanation = shap_explainer.perform_shap(model, X_train_tensor, X_gen_tensor, gene_names, ttpaths.figures_path_shap, 'gen', date)
 
@@ -91,6 +91,12 @@ def pipeline(date: str,
     shap_filename = ttpaths.binn_model_path / f"shap_explanation_{date}.pkl"
     with open(shap_filename, 'wb') as f:
         pickle.dump(shap_explanation, f)
+
+    print("Creating layered SHAP...")
+    shap_df = shap_explainer.layerwise_shap(model, X_train_tensor, X_test_tensor, masks, device)
+    shap_filename = ttpaths.binn_model_path / f"shap_explanation_layered_{date}.pkl"
+    with open(shap_filename, 'wb') as f:
+        pickle.dump(shap_df, f)
 
     print("Pipeline completed!")
 

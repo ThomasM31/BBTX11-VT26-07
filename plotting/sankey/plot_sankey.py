@@ -5,7 +5,6 @@ from holoviews import opts
 import matplotlib.colors as mcolors
 hv.extension('bokeh')
 
-import mock_shap_data as mockshap
 
 def plot_sankey(df, n_top=3, filename='sankey_diagram.html'):
     # 1. Setup absolute weights
@@ -209,4 +208,6 @@ def plot_sankey(df, n_top=3, filename='sankey_diagram.html'):
     hv.save(layout, filename, backend='bokeh')
     return layout
 
-plot_sankey(mockshap.generate_data(), n_top=7)
+shap_data = pd.read_pickle('/data/shared/alzgene26/data/results/binn_model/shap_explanation_layered_260507_1424.pkl')
+
+plot_sankey(shap_data, n_top=7)
