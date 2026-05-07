@@ -115,3 +115,65 @@ def perform_shap(
     plt.close()
 
     print(f"Plots saved to: \n {figpath}")
+
+import torch
+import shap
+import pandas as pd
+import numpy as np
+
+def get_binn_edge_importances(model, X_test, masks_dict, device):
+    """
+    Computes SHAP values for each layer transition in the BINN.
+    Returns a DataFrame with columns: ['Source', 'Target', 'SHAP_Weight']
+    """
+    model.eval()
+    all_edges = []
+    
+    # We iterate through the layers. 
+    # In BINN, layer i connects Source (mask index) to Target (mask columns).
+    for i in range(len(masks_dict)):
+        mask_name = f'df{i}'
+        df_mask = masks_dict[mask_name]
+        
+        # 1. Define the Source and Target names for this transition
+        sources = df_mask.index.tolist()
+        targets = df_mask.columns.tolist()
+        
+        # 2. Get the SHAP values for this specific layer
+        # Note: BINN models often store layers in model.layers or similar
+        # You need to point the explainer to the specific 'Linear' or 'Masked' layer
+        target_layer = model.layers[i] 
+        
+        explainer = shap.GradientExplainer((model, target_layer), X_test.to(device))
+        
+        # Get SHAP values for the activations of this layer
+        # This gives us the importance of each SOURCE node to each TARGET node
+        shap_values = explainer.shap_values(X_test.to(device))
+        
+        # If binary classification, take the positive class
+        if isinstance(shap_values, list):
+            shap_matrix = shap_values[1]
+        else:
+            shap_matrix = shap_values
+
+        # Mean absolute SHAP across all patients for the Sankey flow
+        # Or you can pick Patient 0 as in your previous script
+        mean_shaps = np.abs(shap_matrix).mean(axis=0) 
+
+        # 3. Create the Edge DataFrame
+        # For a BINN, the mask defines which Source connects to which Target.
+        for s_idx, source in enumerate(sources):
+            for t_idx, target in enumerate(targets):
+                # Only include edges that actually exist in the mask
+                if df_mask.iloc[s_idx, t_idx] != 0:
+                    all_edges.append({
+                        'Source': source,
+                        'Target': target,
+                        'SHAP_Weight': mean_shaps[s_idx], # Influence of source on this layer
+                        'Layer': i
+                    })
+
+    return pd.DataFrame(all_edges)
+
+def layerwise_shap():
+    pass
