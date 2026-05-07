@@ -95,7 +95,7 @@ def pipeline(to_include=list,
     train_loader, test_loader = dh.create_dataloaders(train_adata, test_adata, batch_size=BATCH_SIZE)
 
     print("Running train/test loop + saving best model...")
-    history = dh.training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, epochs, patience=10)
+    history = dh.training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, epochs, patience=40)
 
     print("Fetching metrics...")
     metrics = dh.fetch_best_metrics(history)
