@@ -39,7 +39,6 @@ DROPOUT = 1.699e-1
 BATCH_SIZE = 32
 ACTIVATION_FN = nn.Tanh()
 
-
 def pipeline(to_include=list, 
              epochs=int, 
              d_path=tt_data_path, 
@@ -94,8 +93,8 @@ def pipeline(to_include=list,
     print("Getting dataloaders...")
     train_loader, test_loader = dh.create_dataloaders(train_adata, test_adata, batch_size=BATCH_SIZE)
 
-    print("Running train/test loop...")
-    history = dh.training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, epochs)
+    print("Running train/test loop + saving best model...")
+    history = dh.training_loop(model, train_loader, test_loader, criterion, optimizer, device, scheduler, epochs, patience=10)
 
     print("Fetching metrics...")
     metrics = dh.fetch_best_metrics(history)

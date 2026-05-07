@@ -497,12 +497,17 @@ def training_loop(model: BINN,
                   optimizer, 
                   device, 
                   scheduler, 
-                  epochs:int) -> dict:
+                  epochs:int,
+                  patience=10) -> dict:
     """
     Performs the entire training & testing loop over the epochs
     """
     # Metrics dictionary
     history = {'train_loss': [], 'train_acc': [], 'test_loss': [], 'test_acc': []}
+    
+    # Metrics for early stopping
+    best_test_acc = 0.0
+    epochs_without_improvement = 0
 
     for epoch in range(epochs):
         train_loss, train_acc = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
@@ -519,8 +524,44 @@ def training_loop(model: BINN,
         history['train_acc'].append(train_acc)
         history['test_loss'].append(test_loss)
         history['test_acc'].append(test_acc)
+
+        if test_acc > best_test_acc:
+            best_test_acc = test_acc
+            epochs_without_improvement = 0
+
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'test_acc': test_acc,
+            }, "best_model.pt")
+
+            print(f"New best model saved! test_acc = {test_acc:.4f}")
+
+        else:
+            epochs_without_improvement += 1
+
+        # EARLY STOPPING
+        if epochs_without_improvement >= patience:
+            print("Early stopping triggered!")
+            history.update({"best_test_acc": best_test_acc})
+            break
     
     return history
+
+def load_model(model:BINN):
+    """
+    Loads previously found best model
+    """
+    checkpoint = torch.load("best_model.pt")
+
+    model.load_state_dict(checkpoint['model_state_dict'])
+
+    print("Loaded best model with testing accuracy:",
+        checkpoint['test_acc'])
+    
+    return model
+        
 
 def generalizability_test(model: BINN, 
                           gen_loader: AnnLoader, 
