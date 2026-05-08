@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import numpy as np
+import os
 
 # anndata
 import anndata as ad
@@ -77,14 +78,18 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
 
     # Confusion Matrix
     print("Saving confusion matrix..")
+    os.makedirs(SAVE_DIR, exist_ok=True) # Skapar mappen om den saknas
     cm = confusion_matrix(y_test, y_pred, normalize='true')
     cmap = plt.get_cmap('Blues')
-    cmd = ConfusionMatrixDisplay(cm, display_labels=["Healthy", "AD"])
+    cmd = ConfusionMatrixDisplay(cm, display_labels=["Frisk", "AD"])
     cmd.plot(cmap=cmap)#.figure_.savefig('confusion_matrix_SVM.png')
-
-    plt.title("Confusion Matrix (SVM)")
-    plt.savefig('confusion_matrix_SVM.png')
+    plt.title("Förväxlingsmatris (SVM)")
+    plt.xlabel("Förutspådd etikett")
+    plt.ylabel("Sann etikett")
+    save_path = os.path.join(SAVE_DIR, 'confusion_matrix_SVM_swe.png')
+    plt.savefig(save_path, dpi=300)
     plt.close()
+    print(f"Figure saved: {save_path}")
 
     # Classification report 
     report = classification_report(y_test, y_pred, output_dict=True)
@@ -98,6 +103,7 @@ data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_m
 MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
               for i in range(5)]
 TRAIN_SIZE = 0.8
+SAVE_DIR = "figures/ml_model_evaluations"
 
 
 # Pipeline -------------------------------------------------------------------
