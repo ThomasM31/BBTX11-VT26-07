@@ -7,6 +7,7 @@ import torch.nn as nn
 from pathlib import Path
 from datetime import datetime as dt
 import torch.nn.functional as F
+import logging
 
 def perform_shap(
         model: nn.Module, 
@@ -88,7 +89,6 @@ def perform_shap(
 
     now = dt.now().strftime("%y%m%d_%H%M")
 
-
     # Save rawdata for figures:
     # E.g. the SHAP-matrix (importance for each gene per patient)
     shap_df = pd.DataFrame(shap_matrix, columns=gene_names)
@@ -122,62 +122,57 @@ def layerwise_shap(model, X_train_tensor, X_test_tensor, masks, device):
     model.eval()
     all_edges = []
     
-    # We use X_test to determine the 'flow' for the Sankey
-    # We need to track gradients on the input to flow them through the hidden layers
-    x = X_test_tensor.clone().detach().to(device).requires_grad_(True)
-
-    # Forward Pass with Activation Tracking
-    # We store the activations and enable gradient tracking on them
+    # 1. Keep the whole chain connected
+    current_x = X_test_tensor.clone().detach().to(device).requires_grad_(True)
+    
     activations = []
     
-    current_x = x
+    # 2. Forward Pass WITHOUT detaching
     for i, layer in enumerate(model.model_layers):
-        # We need to capture the state of x BEFORE it enters the next layer
-        # because these nodes are the "Sources" for this mask
-        act = current_x.detach().clone().requires_grad_(True)
-        act.retain_grad() 
-        activations.append(act)
+        # Instead of detaching, we keep the current_x in the chain
+        # and tell PyTorch to save its gradient during backward
+        current_x.retain_grad() 
+        activations.append(current_x)
 
-        # Replicate your model's forward logic
         mask = getattr(model, f'mask_{i}')
-        if mask.shape != layer.weight.shape:
-            masked_weight = layer.weight * mask.t()
-        else:
-            masked_weight = layer.weight * mask
+        masked_weight = layer.weight * (mask.t() if mask.shape != layer.weight.shape else mask)
 
-        current_x = F.linear(act, masked_weight, layer.bias)
+        # Compute next layer
+        current_x = F.linear(current_x, masked_weight, layer.bias)
         
         if i < len(model.model_layers) - 1:
             current_x = model.layer_norms[i](current_x)
             current_x = model.activation_fn(current_x)
             current_x = model.dropout(current_x)
 
-    # Calculate gradients of the output with respect to all captured activations
+    # 3. Backward Pass
     model.zero_grad()
-    # If binary classification output is (Patients, 1), we sum to get a scalar for backward
     current_x.sum().backward()
 
-    # Calculate Connection Importance
+    # 4. Importance Calculation
     for i in range(len(masks)):
         mask_key = f'df{i}'
         current_mask = masks[mask_key]
+        
+        # --- RESTORED VARIABLES ---
         sources = current_mask.index.tolist()
         targets = current_mask.columns.tolist()
+        # --------------------------
 
-        # Importance = Activation * Gradient (averaged across patients)
         act = activations[i]
         if act.grad is not None:
-            # mean absolute value across the batch
-            importance_scores = (act * act.grad).abs().mean(dim=0).cpu().detach().numpy()
+            # Importance = Mean absolute value of (Activation * Gradient)
+            #importance_scores = (act * act.grad).abs().mean(dim=0).cpu().detach().numpy()
+            importance_scores = (act * act.grad).mean(dim=0).cpu().detach().numpy()
         else:
+            logging.warning(f"No gradients for layer {i}!")
             importance_scores = np.zeros(len(sources))
 
         # Map to Sankey DataFrame
         for s_idx, source_name in enumerate(sources):
             weight = importance_scores[s_idx]
             
-            # Find which targets this source actually connects to in this mask
-            # row s_idx, columns where mask != 0
+            # Find active connections in the adjacency mask
             active_targets_mask = current_mask.iloc[s_idx] != 0
             active_target_names = current_mask.columns[active_targets_mask].tolist()
             
@@ -185,7 +180,9 @@ def layerwise_shap(model, X_train_tensor, X_test_tensor, masks, device):
                 all_edges.append({
                     'Source': source_name,
                     'Target': target_name,
-                    'SHAP_Weight': float(weight)
+                    'SHAP_Weight': float(weight),
+                    'Source_Layer': i,
+                    'Target_Layer': i + 1
                 })
 
     return pd.DataFrame(all_edges)
