@@ -566,14 +566,16 @@ def load_model(model:BINN):
 def generalizability_test(model: BINN, 
                           gen_loader: AnnLoader, 
                           criterion, 
-                          device) -> tuple:
+                          device,
+                          save:bool = False) -> tuple:
     
     # Run the test loop
     gen_loss, gen_acc = bt.test_one_epoch(
         model=model, 
         test_loader=gen_loader, 
         criterion=criterion, 
-        device=device
+        device=device,
+        save=save
     )
 
     return (gen_loss, gen_acc)

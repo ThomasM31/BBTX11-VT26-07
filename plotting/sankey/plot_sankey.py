@@ -208,6 +208,6 @@ def plot_sankey(df, n_top=3, filename='sankey_diagram.html'):
     hv.save(layout, filename, backend='bokeh')
     return layout
 
-shap_data = pd.read_pickle('/data/shared/alzgene26/data/results/binn_model/shap_explanation_layered_260507_1424.pkl')
+shap_data = pd.read_pickle('/data/shared/alzgene26/data/results/binn_model/shap_explanation_layered_260507_1753.pkl')
 
-plot_sankey(shap_data, n_top=7)
+plot_sankey(shap_data, n_top=10)

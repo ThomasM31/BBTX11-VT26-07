@@ -55,7 +55,8 @@ def train_one_epoch(model: BINN,
 def test_one_epoch(model: BINN, 
                     test_loader: AnnLoader, 
                     criterion: nn.Module, 
-                    device):
+                    device,
+                    save: bool = False):
     """
     Tests the BINN one epoch
     """
@@ -64,6 +65,8 @@ def test_one_epoch(model: BINN,
     correct = 0
     total = 0
     running_loss = 0.0
+
+    all_results: list[pd.DataFrame] = []
     
     with torch.no_grad():
         for batch in test_loader:
@@ -76,6 +79,16 @@ def test_one_epoch(model: BINN,
                 labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
 
             outputs = model(inputs)
+
+            if save:
+                batch_data = {
+                    "actual_label": labels.cpu().numpy().flatten(),
+                    "prediction_logic": outputs.cpu().numpy().flatten(),
+                    "binary_pred": (outputs > 0.0).float().cpu().numpy().flatten()
+                }
+
+                all_results.append(pd.DataFrame(batch_data))
+
             loss = criterion(outputs, labels)
             
             running_loss += loss.item() * inputs.size(0)
@@ -83,6 +96,10 @@ def test_one_epoch(model: BINN,
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
     
+    if save:
+        df_final = pd.concat(all_results, ignore_index=True)
+        df_final.to_csv("gen_results.csv", index=False)
+
     epoch_loss = running_loss / total
     epoch_acc = correct / total
     return epoch_loss, epoch_acc

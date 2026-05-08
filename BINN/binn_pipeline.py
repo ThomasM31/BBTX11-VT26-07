@@ -137,7 +137,7 @@ def pipeline(to_include=list,
     gen_loader = dh.create_generalizability_dataloader(gen_adata_global['all'], BATCH_SIZE)
     
     # test the model with the generalizability data 
-    gen_loss, gen_acc = dh.generalizability_test(model, gen_loader, criterion, device)
+    gen_loss, gen_acc = dh.generalizability_test(model, gen_loader, criterion, device, save=True)
 
     print(f"Generalizability Test - Loss: {gen_loss:.4f}, Accuracy: {gen_acc:.4f}")
 
