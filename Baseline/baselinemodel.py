@@ -83,7 +83,7 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     cmap = plt.get_cmap('Blues')
     cmd = ConfusionMatrixDisplay(cm, display_labels=["Frisk", "AD"])
     cmd.plot(cmap=cmap)#.figure_.savefig('confusion_matrix_SVM.png')
-    plt.title("Förväxlingsmatris (SVM)")
+    plt.title("Normaliserad förväxlingsmatris: SVM")
     plt.xlabel("Förutspådd etikett")
     plt.ylabel("Sann etikett")
     save_path = os.path.join(SAVE_DIR, 'confusion_matrix_SVM_swe.png')
