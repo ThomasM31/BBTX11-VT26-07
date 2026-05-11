@@ -48,7 +48,8 @@ g = sns.clustermap(
 )
 g.ax_heatmap.set_ylabel("Prover (Patienter)")
 g.ax_heatmap.set_xlabel("Topp 20 Proteiner")
-plt.savefig(f"{SAVE_DIR}/clustermap_final.png", dpi=300)
+g.cax.set_title("Relativt uttryck\n(Z-score)", fontsize=10, pad=15)
+plt.savefig(f"{SAVE_DIR}/clustermap_final_swe.png", dpi=300)
 
 # Plot 2, Boxplot & Presence:
 fig, (ax_box, ax_bar) = plt.subplots(
