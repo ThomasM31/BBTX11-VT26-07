@@ -94,7 +94,7 @@ def run_evaluation():
         
         # Generate Figure 2a and 2c equivalents from the plan
         draw_roc(axes[0], (y_t_binn, y_s_binn), (y_t_svm, y_s_svm))
-        draw_confusion(axes[1], y_t_binn, y_s_binn)
+        draw_confusion(axes[1], y_t_binn, y_s_binn, 'BINN (ROSMAP)')
         
         plt.tight_layout()
         save_path = os.path.join(SAVE_DIR, "global_binn_evaluation_swe.png")
@@ -103,19 +103,49 @@ def run_evaluation():
     else:
         print("Required data file 'binn_test_results.csv' not found. Please run the pipeline first.")
 
-def run_gen_evaluation():
+def run_binn_CM():
     # Orchestrate the loading and plotting process
     y_t_binn, y_s_binn = load_binn_scores()    
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 5))
     
-    draw_confusion(ax, y_t_binn, y_s_binn, 'BINN')
+    draw_confusion(ax, y_t_binn, y_s_binn, 'BINN (ROSMAP)')
     
     plt.tight_layout()
     save_path = os.path.join(SAVE_DIR, "binn_evaluation_swe.png")
     plt.savefig(save_path, dpi=300)
     print(f"Evaluation complete. Figure saved to: {save_path}")
+    plt.tight_layout()
 
+def run_svm_CM():
+    # Orchestrate the loading and plotting process
+    y_t_binn, y_s_binn = load_svm_scores()    
+
+    fig, ax = plt.subplots(1, 1, figsize=(12, 5))
+    
+    draw_confusion(ax, y_t_binn, y_s_binn, 'SVM (ROSMAP)')
+    
+    plt.tight_layout()
+    save_path = os.path.join(SAVE_DIR, "svm_evaluation_swe.png")
+    plt.savefig(save_path, dpi=300)
+    print(f"Evaluation complete. Figure saved to: {save_path}")
+    plt.tight_layout()
+
+def run_gen_CM():
+    # Orchestrate the loading and plotting process
+    y_t_binn, y_s_binn = load_gen_scores()    
+
+    fig, ax = plt.subplots(1, 1, figsize=(12, 5))
+    
+    draw_confusion(ax, y_t_binn, y_s_binn, 'BINN (SWDBB)')
+    
+    plt.tight_layout()
+    save_path = os.path.join(SAVE_DIR, "gen_evaluation_swe.png")
+    plt.savefig(save_path, dpi=300)
+    print(f"Evaluation complete. Figure saved to: {save_path}")
+    plt.tight_layout()
 
 if __name__ == "__main__":
-    run_gen_evaluation()
+    run_gen_CM()
+    run_binn_CM()
+    run_svm_CM()
