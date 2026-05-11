@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=draw_sankey
-#SBATCH --partition=long
-#SBATCH --time=03:00:00
+#SBATCH --partition=short
+#SBATCH --time=00:10:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
@@ -35,7 +35,7 @@ export PYTHONUNBUFFERED=1
 
 # Run the Python script
 # We use 'time' to see how long the Python process actually took
-time python3 -u plot_sankey.py; getLast
+time python3 -u plot_sankey.py
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?
