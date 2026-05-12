@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 import holoviews as hv
@@ -7,6 +9,13 @@ import logging
 import re
 from bokeh.models import LinearColorMapper, ColorBar, FixedTicker
 hv.extension('bokeh')
+
+
+import pipeline_paths as ppaths
+
+# Global configuration and directory setup
+pp = ppaths.PipelinePaths(True)
+save_path: Path = pp.figures_path_shap / 'sankey'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -137,11 +146,11 @@ def get_bidirectional_subnetwork(df, target_node):
     return combined_df
 
 def plot_sankey(
-        df, 
-        n_top=3, 
-        filename='sankey_diagram.html', 
-        is_subnetwork_plot=False, 
-        output_node_label='Output Node'
+        df: pd.DataFrame, 
+        n_top: int = 10, 
+        filename: Path | str = save_path / 'sankey_diagram.html', 
+        is_subnetwork_plot: bool =False, 
+        output_node_label: str ='Output Node'
         ):
     logging.info(f"Starting Sankey plot generation with n_top={n_top}")
     
@@ -385,7 +394,7 @@ def plot_sankey(
 
 shap_data = pd.read_pickle('/data/shared/alzgene26/data/results/binn_model/shap_explanation_layered_260508_0940.pkl')
 
-plot_sankey(shap_data, 10, 'plots/sankey_top_10.html')
+plot_sankey(shap_data, 10, save_path / 'sankey_top_10.html')
 
 '''
 genes: list[tuple[str, int]] = [('UBB', 10), ('UBC', 10), ('PSMA1', 10), ('FYN', 10), ('ERBB4', 10)]
@@ -395,7 +404,7 @@ for gene, n_top in genes:
     plot_sankey(
     downstream_df, 
         n_top=n_top, 
-        filename=f'plots/{fname_label}_downstream.html', 
+        filename=save_path / f'plots/{fname_label}_downstream.html', 
     )
 '''
 
@@ -408,7 +417,7 @@ for process, n_top in draw_upstream:
     plot_sankey(
         df, 
         n_top=n_top, 
-        filename=f'plots/{fname_label}_upstream_subnetwork.html',
+        filename= save_path / f'{fname_label}_upstream_subnetwork.html',
         output_node_label=readable_label
     )
 
@@ -422,7 +431,7 @@ for process, n_top in draw_downstream:
     plot_sankey(
         df, 
         n_top=n_top, 
-        filename=f'plots/{fname_label}_downstream_subnetwork.html',
+        filename=save_path / f'{fname_label}_downstream_subnetwork.html',
         output_node_label=readable_label
     )'''
 
@@ -438,14 +447,14 @@ bidirectional_df = get_bidirectional_subnetwork(shap_data, target)
 plot_sankey(
     bidirectional_df, 
     n_top=100, 
-    filename='meiosis_bidirectional_analysis.html', 
+    filename=save_path / 'meiosis_bidirectional_analysis.html', 
     is_subnetwork_plot=True
     )
 
 plot_sankey(
     upstream_df, 
     n_top=15, 
-    filename='meiosis_upstream_analysis.html', 
+    filename=save_path / 'meiosis_upstream_analysis.html', 
     is_subnetwork_plot=True, 
     output_node_label=readable_label
     )
@@ -456,7 +465,7 @@ bidirectional_df = get_bidirectional_subnetwork(shap_data, target)
 plot_sankey(
     bidirectional_df, 
     n_top=100, 
-    filename=f'{readable_label}_bidirectional_analysis.html', 
+    filename=save_path / f'{readable_label}_bidirectional_analysis.html', 
     is_subnetwork_plot=True
     )
 
@@ -466,7 +475,7 @@ upstream_df = extract_process_lineage(shap_data, target, direction='upstream')
 plot_sankey(
     upstream_df, 
     n_top=10, 
-    filename='signal_transduction_upstream_analysis.html', 
+    filename=save_path / 'signal_transduction_upstream_analysis.html', 
     is_subnetwork_plot=True, 
     output_node_label=readable_label
     )
