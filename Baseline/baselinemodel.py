@@ -98,15 +98,17 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
 
     # Confusion Matrix
     print("Saving confusion matrix..")
+    os.makedirs(SAVE_DIR, exist_ok=True) # Skapar mappen om den saknas
     cm = confusion_matrix(y_test, y_pred, normalize='true')
     cmap = plt.get_cmap('Blues')
-    cmd = ConfusionMatrixDisplay(cm, display_labels=["Healthy", "AD"])
+    cmd = ConfusionMatrixDisplay(cm, display_labels=["Frisk", "AD"])
     cmd.plot(cmap=cmap)#.figure_.savefig('confusion_matrix_SVM.png')
 
     plt.title("Confusion Matrix (SVM)")
     plt.savefig(fig_save_path / f'confusion_matrix_SVM_{date}.png')
     print(f'Saved CM to {fig_save_path / f'confusion_matrix_SVM_{date}.png'}')
     plt.close()
+    print(f"Figure saved: {save_path}")
 
     # Classification report 
     report = classification_report(y_test, y_pred, output_dict=True)
