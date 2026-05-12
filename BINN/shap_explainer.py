@@ -87,7 +87,7 @@ def perform_shap(
         feature_names=gene_names  
     )
 
-    now = dt.now().strftime("%y%m%d_%H%M")
+    date = dt.now().strftime("%y%m%d_%H%M")
 
     # Save rawdata for figures:
     # E.g. the SHAP-matrix (importance for each gene per patient)
@@ -98,22 +98,7 @@ def perform_shap(
     
     print(f"Data saved to CSV in: {figpath}")
 
-    # generate the plots
-    print("Displaying Beeswarm Plot...")
-    shap.plots.beeswarm(shap_explanation, show=False, max_display=11)
-    plt.savefig(figpath / f'beeswarm_{stage}_{date}.png', bbox_inches='tight')
-    plt.close()
-
-    for i in list(range(3)):
-        print(f"Displaying Waterfall Plot for Patient {i}...")
-        shap.plots.waterfall(shap_explanation[i], show=False, max_display=11)
-        plt.savefig(figpath / f'waterfall_{stage}_{date}_{i}.png', bbox_inches='tight')
-        plt.close()
-
-    print("Displaying Violin Plot...")
-    shap.plots.violin(shap_explanation, show=False, max_display=11)
-    plt.savefig(figpath / f'violin_plot_{stage}_{date}.png', bbox_inches='tight')
-    plt.close()
+    
 
     print(f"Plots saved to: \n {figpath}")
 
