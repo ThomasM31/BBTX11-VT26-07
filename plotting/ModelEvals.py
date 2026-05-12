@@ -6,40 +6,41 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc, confusion_matrix
+import numpy.typing as npt
+from typing import Tuple, Optional
+
+import pipeline_paths as ppaths
 
 # Global configuration and directory setup
-SAVE_DIR = "figures/ml_model_evaluations"
+pp = ppaths.PipelinePaths(True)
+SAVE_DIR = pp.figures_path / 'model_eval'
 N_BOOTSTRAP = 1000
 RANDOM_SEED = 42
 os.makedirs(SAVE_DIR, exist_ok=True)
 rng = np.random.default_rng(RANDOM_SEED)
 
-# Load BINN results:
-def load_binn_scores(): 
-    if os.path.exists("plotting/ModelResults/binn_test_results.csv"):
-        df = pd.read_csv("plotting/ModelResults/binn_test_results.csv") 
-        return df['y_true'].values, df['y_prob'].values
-    return None, None
 
-# Load generalizability results:
-def load_gen_scores(): 
-    p = "/data/shared/alzgene26/data/results/binn_results/gen_test_results_260508_0940_conv.csv"
-    if os.path.exists(p):
-        df = pd.read_csv(p) 
-        return df['y_true'].values, df['y_prob'].values
-    return None, None
-
-# Load SVM results:
-def load_svm_scores():
-    if os.path.exists("plotting/ModelResults/svm_test_results.csv"):
-        df = pd.read_csv("plotting/ModelResults/svm_test_results.csv")
-        return df['y_true'].values, df['y_prob'].values
-    else:
-        print("Warning: svm_test_results.csv not found, using placeholder data.")
-        n = 500
-        y_true = rng.integers(0, 2, size=n)
-        y_scores = np.clip(y_true * 0.6 + rng.normal(0, 0.3, size=n), 0, 1)
-        return y_true, y_scores
+def load_scores(path: str, mode_binary: bool) -> Tuple[Optional[npt.NDArray[np.int_]], Optional[npt.NDArray[np.float64]]]:
+    '''
+    Loads binary or probability prediction values. 
+    Binary prediction values are used for Confusion Matrix.
+    Probability prediction values are used for ROC.
+    '''
+    try:
+        df = pd.read_csv(path)
+        y_true = df['y_true'].to_numpy(dtype=np.int_)
+        if mode_binary:
+            y_prob = df['y_pred'].to_numpy(dtype=np.float64)
+        else:
+            y_prob = df['y_prob'].to_numpy(dtype=np.float64)
+        return y_true, y_prob
+    except FileNotFoundError:
+        print(f'File {path} not found!')
+        
+        return (
+            np.concatenate((np.ones((5,1), dtype=int), np.zeros((5,1), dtype=int))), 
+            np.concatenate((np.zeros((5,1)), np.ones((5,1))))
+            )
 
 def get_bootstrap_roc(y_true, y_scores):
     # Calculate mean ROC and confidence intervals using bootstrapping
@@ -66,9 +67,9 @@ def draw_roc(ax, binn_data, svm_data):
     ax.set_ylabel("Sensitivitet")
     ax.legend(fontsize=8)
 
-def draw_confusion(ax, y_t, y_s, label):
+def draw_confusion(ax, y_t:npt.NDArray[np.int_], y_s: npt.NDArray[np.float64], label:str):
     # Plot the normalized confusion matrix for the BINN
-    cm = confusion_matrix(y_t, (y_s >= 0.5).astype(int), normalize="true")
+    cm = confusion_matrix(y_t, y_s, normalize="true")
     im = ax.imshow(cm, cmap="Blues", vmin=0, vmax=1)
     
     # Annotate the matrix with mean values
@@ -77,75 +78,52 @@ def draw_confusion(ax, y_t, y_s, label):
             color = "white" if cm[i,j] > 0.5 else "black"
             ax.text(j, i, f"{cm[i,j]:.2f}", ha="center", va="center", color=color)
             
-    ax.set_title("Normaliserad förväxlingsmatris: {label}")
+    ax.set_title(f"Normaliserad förväxlingsmatris: {label}")
     ax.set_xticks([0, 1], ["Frisk", "AD"])
     ax.set_yticks([0, 1], ["Frisk", "AD"])
     ax.set_xlabel("Förutspådd etikett")
     ax.set_ylabel("Sann etikett")
 
-def run_evaluation():
+def run_roc(binn_path: str, svm_path: str, labels: list[str] = ['']):
     # Orchestrate the loading and plotting process
-    y_t_binn, y_s_binn = load_binn_scores()
-    
+    y_t_binn, y_s_binn = load_scores(binn_path, False)
+
     if y_t_binn is not None:
-        y_t_svm, y_s_svm = load_svm_scores(cell_type="global")
+        y_t_svm, y_s_svm = load_scores(svm_path, False)
         
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+        fig, axes = plt.subplots(1, 1)
         
-        # Generate Figure 2a and 2c equivalents from the plan
-        draw_roc(axes[0], (y_t_binn, y_s_binn), (y_t_svm, y_s_svm))
-        draw_confusion(axes[1], y_t_binn, y_s_binn, 'BINN (ROSMAP)')
+        draw_roc(axes, (y_t_binn, y_s_binn), (y_t_svm, y_s_svm))
         
         plt.tight_layout()
         save_path = os.path.join(SAVE_DIR, "global_binn_evaluation_swe.png")
         plt.savefig(save_path, dpi=300)
         print(f"Evaluation complete. Figure saved to: {save_path}")
     else:
-        print("Required data file 'binn_test_results.csv' not found. Please run the pipeline first.")
+        print(f"File {binn_path} not found, or required column(s) missing.")
 
-def run_binn_CM():
+
+def run_CM(in_path: str, out_path: str, label: str) -> None:
     # Orchestrate the loading and plotting process
-    y_t_binn, y_s_binn = load_binn_scores()    
+    y_t_binn, y_s_binn = load_scores(in_path, True)    
 
-    fig, ax = plt.subplots(1, 1, figsize=(12, 5))
+    fig, ax = plt.subplots(1, 1)
     
-    draw_confusion(ax, y_t_binn, y_s_binn, 'BINN (ROSMAP)')
+    draw_confusion(ax, y_t_binn, y_s_binn, label)
     
     plt.tight_layout()
-    save_path = os.path.join(SAVE_DIR, "binn_evaluation_swe.png")
-    plt.savefig(save_path, dpi=300)
-    print(f"Evaluation complete. Figure saved to: {save_path}")
-    plt.tight_layout()
-
-def run_svm_CM():
-    # Orchestrate the loading and plotting process
-    y_t_binn, y_s_binn = load_svm_scores()    
-
-    fig, ax = plt.subplots(1, 1, figsize=(12, 5))
-    
-    draw_confusion(ax, y_t_binn, y_s_binn, 'SVM (ROSMAP)')
-    
-    plt.tight_layout()
-    save_path = os.path.join(SAVE_DIR, "svm_evaluation_swe.png")
-    plt.savefig(save_path, dpi=300)
-    print(f"Evaluation complete. Figure saved to: {save_path}")
-    plt.tight_layout()
-
-def run_gen_CM():
-    # Orchestrate the loading and plotting process
-    y_t_binn, y_s_binn = load_gen_scores()    
-
-    fig, ax = plt.subplots(1, 1, figsize=(12, 5))
-    
-    draw_confusion(ax, y_t_binn, y_s_binn, 'BINN (SWDBB)')
-    
-    plt.tight_layout()
-    save_path = os.path.join(SAVE_DIR, "gen_evaluation_swe.png")
+    save_path = os.path.join(SAVE_DIR, out_path)
     plt.savefig(save_path, dpi=300)
     print(f"Evaluation complete. Figure saved to: {save_path}")
     plt.tight_layout()
 
 if __name__ == "__main__":
-    run_gen_CM()
-    run_binn_CM()
-    run_svm_CM()
+
+    binn_path = '/data/shared/alzgene26/data/results/binn_results/binn_test_results_260508_0940.csv'
+    svm_path = '/data/shared/alzgene26/data/results/svm_results/svm_test_results_260512_0806.csv'
+    gen_path = '/data/shared/alzgene26/data/results/binn_results/gen_test_results_260508_0940_conv.csv'
+    run_roc(binn_path, svm_path)
+    
+    #run_CM(svm_path, 'svm_evaluation_swe_260512_0806.png', 'SVM (ROSMAP)')
+    #run_CM(binn_path, 'binn_evaluation_swe.png', 'BINN (ROSMAP)')
+    #run_CM(gen_path, 'swdbb_evaluation_swe.png', 'BINN (SWDBB)')
