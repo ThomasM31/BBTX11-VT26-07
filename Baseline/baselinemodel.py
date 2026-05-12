@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import numpy as np
+from datetime import datetime as dt
+from pathlib import Path
 
 # anndata
 import anndata as ad
@@ -18,6 +20,13 @@ from anndata.experimental import AnnCollection
 
 # Own files
 import BINN.custom_train_test_split as ctts
+
+import pipeline_paths as ppaths
+
+pp = ppaths.PipelinePaths(True, 'mg_200_mc_200_mhvg1000')
+
+result_save_path = pp.svm_results_path
+fig_save_path = pp.svm_results_path
 
 def read_adata(indices: list, train_size=0.8):
     train_adata, test_adata, collection = ctts.pipeline(indices, data_path, train_size)
@@ -63,13 +72,18 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     print(f"CV Scores: {scores}")
     print(f"Mean CV AUC: {scores.mean():.4f}")
 
+    date = dt.now().strftime("%y%m%d_%H%M")
+
     y_pred = clf_svm.predict(X_test_pca)
     df_svm = pd.DataFrame({
         'y_true': y_test, 
-        'y_prob': y_scores
+        'y_prob': y_scores,
+        'y_pred': y_pred
     })
-    df_svm.to_csv("svm_test_results.csv", index=False)
-    print("Saved: svm_test_results.csv")
+
+    fname = f"svm_test_results_{date}.csv" 
+    df_svm.to_csv(result_save_path / fname, index=False)
+    print(f"Saved results to: {result_save_path / fname}")
 
     # Accuracy 
     acc = accuracy_score(y_test, y_pred)
@@ -83,7 +97,8 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     cmd.plot(cmap=cmap)#.figure_.savefig('confusion_matrix_SVM.png')
 
     plt.title("Confusion Matrix (SVM)")
-    plt.savefig('confusion_matrix_SVM.png')
+    plt.savefig(fig_save_path / f'confusion_matrix_SVM_{date}.png')
+    print(f'Saved CM to {fig_save_path / f'confusion_matrix_SVM_{date}.png'}')
     plt.close()
 
     # Classification report 
