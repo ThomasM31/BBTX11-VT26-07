@@ -10,7 +10,7 @@
 
 # --- LOGGING SETUP ---
 # %A = Master Job ID | %a = Array Index ID
-# This creates one log file per task (e.g., logs/hvgs_12345_0.out)
+# This creates one log file per task
 #SBATCH --output=logs/%A_draw_sankey.out
 # This captures errors in a separate file for quicker debugging
 #SBATCH --error=logs/%A_draw_sankey.err
@@ -35,7 +35,7 @@ export PYTHONUNBUFFERED=1
 
 # Run the Python script
 # We use 'time' to see how long the Python process actually took
-time python3 -u plot_sankey.py
+time python3 -u -m plotting.sankey.plot_sankey
 
 # Capture the exit code of the Python script
 EXIT_CODE=$?
@@ -51,7 +51,7 @@ fi
 # print snapshot of error to terminal
 if [ $EXIT_CODE -ne 0 ]; then
     echo "--- ERROR LOG SNAPSHOT ---"
-    cat "logs/hvgs_${SLURM_ARRAY_JOB_ID}.err"
+    cat "logs/${SLURM_ARRAY_JOB_ID}_draw_sankey.err"
     echo "--------------------------"
 fi
 

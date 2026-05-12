@@ -9,6 +9,7 @@ import logging
 import re
 from bokeh.models import LinearColorMapper, ColorBar, FixedTicker
 hv.extension('bokeh')
+#hv.help(hv.Sankey)
 
 
 import pipeline_paths as ppaths
@@ -150,7 +151,8 @@ def plot_sankey(
         n_top: int = 10, 
         filename: Path | str = save_path / 'sankey_diagram.html', 
         is_subnetwork_plot: bool =False, 
-        output_node_label: str ='Output Node'
+        output_node_label: str ='Output Node',
+        no_labels: bool = False
         ):
     logging.info(f"Starting Sankey plot generation with n_top={n_top}")
     
@@ -303,15 +305,42 @@ def plot_sankey(
     
     node_imp['label'] = node_imp['index'].apply(lambda x: x.split('_L')[0] if '_L' in str(x) else x)
     
-    max_layer = node_imp['layer'].max()
+    '''max_layer = node_imp['layer'].max()
     node_imp['label'] = node_imp.apply(
         lambda row: output_node_label if (
             row['layer'] == max_layer and 
             (row['label'] == 'output_node' or 'Other in Layer' in row['label'])
         ) else row['label'], axis=1
-    )
-    node_imp['label'] = node_imp['label'].apply(lambda x: readable_labels.get(x, x))
-    node_imp['label'] = node_imp['label'].apply(lambda x: wrap(x, 3)) # Shorter wrap for subnets
+    )'''
+
+    max_layer = node_imp['layer'].max()
+
+    def process_label(row):
+        # Global toggle for no labels
+        if no_labels:
+            return ' '
+        
+        current_label = str(row['label'])
+        current_layer = row['layer']
+
+        # Specific replacement for the final layer (Layer 5/Max Layer)
+        if current_layer == max_layer and (current_label == 'output_node' or 'Other in Layer' in current_label) :
+            return output_node_label
+        
+        if 'Other in Layer' in current_label and current_layer != max_layer:
+            layer_num = current_label.split('Layer ')[-1]
+            return f'Övriga i lager {layer_num}'
+        
+        return current_label
+
+    node_imp['label'] = node_imp.apply(process_label, axis=1)
+
+    if not no_labels:
+        node_imp['label'] = node_imp['label'].apply(lambda x: readable_labels.get(x, x))
+        node_imp['label'] = node_imp['label'].apply(lambda x: wrap(x, 3))
+
+    #node_imp['label'] = node_imp['label'].apply(lambda x: readable_labels.get(x, x))
+    #node_imp['label'] = node_imp['label'].apply(lambda x: wrap(x, 3)) # Shorter wrap for subnets
 
     node_imp = node_imp.sort_values('layer').reset_index(drop=True)
 
@@ -394,7 +423,7 @@ def plot_sankey(
 
 shap_data = pd.read_pickle('/data/shared/alzgene26/data/results/binn_model/shap_explanation_layered_260508_0940.pkl')
 
-plot_sankey(shap_data, 10, save_path / 'sankey_top_10.html')
+#plot_sankey(shap_data, 10, save_path / 'sankey_top_10.html', output_node_label='alzheimer')
 
 '''
 genes: list[tuple[str, int]] = [('UBB', 10), ('UBC', 10), ('PSMA1', 10), ('FYN', 10), ('ERBB4', 10)]
@@ -409,7 +438,7 @@ for gene, n_top in genes:
 '''
 
 draw_upstream: list[tuple[str, int]] = [('R-HSA-162582', 10), ('R-HSA-69278', 10), ('R-HSA-5693606', 10), ('R-HSA-1500620', 10), ("R-HSA-5693606", 10)]
-draw_upstream: list[tuple[str, int]] = [('R-HSA-1640170', 10)]
+draw_upstream: list[tuple[str, int]] = [('R-HSA-8953854', 10)]
 for process, n_top in draw_upstream:
     df: pd.DataFrame = get_subnetwork(shap_data, process, direction='upstream')
     fname_label = format_fname_label(readable_labels[process])
