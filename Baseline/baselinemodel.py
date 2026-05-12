@@ -20,13 +20,20 @@ from anndata.experimental import AnnCollection
 
 # Own files
 import BINN.custom_train_test_split as ctts
-
 import pipeline_paths as ppaths
 
 pp = ppaths.PipelinePaths(True, 'mg_200_mc_200_mhvg1000')
-
 result_save_path = pp.svm_results_path
 fig_save_path = pp.svm_results_path
+data_path = pp.compl_full_pipe_path
+mask_path = pp.mask_full_pipe_path
+MASK_PATHS = [mask_path / f"oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+            for i in range(5)]
+
+# GLOBALS
+LABELS = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
+ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
+TRAIN_SIZE = 0.8
 
 def read_adata(indices: list, train_size=0.8):
     train_adata, test_adata, collection = ctts.pipeline(indices, data_path, train_size)
@@ -105,14 +112,8 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     report = classification_report(y_test, y_pred, output_dict=True)
     print(report)
 
-# GLOBALS
-LABELS = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
-ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-base_path = "/data/shared/alzgene26/data"
-data_path = base_path + "/processed_data/completed/full_pipeline/mg_200_mc_200_mhvg1000/"
-MASK_PATHS = [f"/data/shared/alzgene26/PathwayData/MaskMatrixLayers/full_pipeline/mg_200_mc_200_mhvg1000/oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
-              for i in range(5)]
-TRAIN_SIZE = 0.8
+
+
 
 
 # Pipeline -------------------------------------------------------------------
