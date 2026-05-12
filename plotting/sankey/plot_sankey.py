@@ -260,10 +260,12 @@ def plot_sankey(
     logging.info("Layer mapping complete.")
 
     # Define the palette
-    rdbu_colors = ["#6dbcea", "#eea3da", "#f06e84"]
     n_steps = 256
     max_val = 0.8
-    palette = [mcolors.to_hex(c) for c in mcolors.LinearSegmentedColormap.from_list("", rdbu_colors)(np.linspace(0, 1, n_steps))]
+    nodes = [0.0, 0.5, 0.5, 1.0]
+    rdbu_colors = ["#0a9cf1", "#cce4f3", "#f4c4cc", "#f44b67"]
+    cmap = mcolors.LinearSegmentedColormap.from_list("", list(zip(nodes, rdbu_colors)))
+    palette = [mcolors.to_hex(c) for c in cmap(np.linspace(0, 1, n_steps))]
 
     def get_color(val, name):
         if name and "Other" in str(name): 
@@ -383,7 +385,8 @@ def plot_sankey(
 
 shap_data = pd.read_pickle('/data/shared/alzgene26/data/results/binn_model/shap_explanation_layered_260508_0940.pkl')
 
-plot_sankey(shap_data, 10, 'sankey_top_10.html')
+plot_sankey(shap_data, 10, 'plots/sankey_top_10.html')
+
 '''
 genes: list[tuple[str, int]] = [('UBB', 10), ('UBC', 10), ('PSMA1', 10), ('FYN', 10), ('ERBB4', 10)]
 for gene, n_top in genes:
@@ -392,21 +395,37 @@ for gene, n_top in genes:
     plot_sankey(
     downstream_df, 
         n_top=n_top, 
-        filename=f'{fname_label}_downstream.html', 
+        filename=f'plots/{fname_label}_downstream.html', 
     )
+'''
 
 draw_upstream: list[tuple[str, int]] = [('R-HSA-162582', 10), ('R-HSA-69278', 10), ('R-HSA-5693606', 10), ('R-HSA-1500620', 10), ("R-HSA-5693606", 10)]
+draw_upstream: list[tuple[str, int]] = [('R-HSA-1640170', 10)]
 for process, n_top in draw_upstream:
-    upstream_df: pd.DataFrame = get_subnetwork(shap_data, process, direction='upstream')
+    df: pd.DataFrame = get_subnetwork(shap_data, process, direction='upstream')
     fname_label = format_fname_label(readable_labels[process])
     readable_label = readable_labels[process]
     plot_sankey(
-        upstream_df, 
+        df, 
         n_top=n_top, 
-        filename=f'{fname_label}_upstream_subnetwork.html',
+        filename=f'plots/{fname_label}_upstream_subnetwork.html',
         output_node_label=readable_label
     )
-'''
+
+
+
+'''draw_downstream: list[tuple[str, int]] = [('R-HSA-69278', 10)]
+for process, n_top in draw_downstream:
+    df: pd.DataFrame = get_subnetwork(shap_data, process, direction='downstream')
+    fname_label = format_fname_label(readable_labels[process])
+    readable_label = readable_labels[process]
+    plot_sankey(
+        df, 
+        n_top=n_top, 
+        filename=f'plots/{fname_label}_downstream_subnetwork.html',
+        output_node_label=readable_label
+    )'''
+
 '''
 target = "R-HSA-69278" # cell cycle, meiotic
 readable_label = readable_labels[target]
