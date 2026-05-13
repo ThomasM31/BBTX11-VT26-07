@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import os
 
 # Config:
-SHAP_PATH = "/data/shared/alzgene26/data/figures/shap/real_shap_values_260508_0940.csv"
-EXPR_PATH = "/data/shared/alzgene26/data/figures/shap/real_expression_values_260508_0940.csv"
-RESULTS_PATH = "/data/users/lucasant/kandidatarbete/BBTX11-VT26-07/plotting/ModelResults/binn_test_results.csv" 
+SHAP_PATH = "/data/shared/alzgene26/data/figures/shap/real_shap_values_ROSMAP_260513_1407.csv"
+EXPR_PATH = "/data/shared/alzgene26/data/figures/shap/real_expression_values_ROSMAP_260513_1407.csv"
+RESULTS_PATH = "/data/shared/alzgene26/data/results/binn_results/binn_test_results_260508_0940.csv" 
 SAVE_DIR = "figures/hierarchicalclustering"
 
 os.makedirs(SAVE_DIR, exist_ok=True)
@@ -53,7 +53,7 @@ g = sns.clustermap(
 g.ax_heatmap.set_ylabel("Prover (Patienter)")
 g.ax_heatmap.set_xlabel("Topp 20 Proteiner")
 g.cax.set_title("Relativt uttryck\n(Z-score)", fontsize=10, pad=15)
-g.savefig(f"{SAVE_DIR}/clustermap_final_swe.png", dpi=300, bbox_inches='tight')
+g.savefig(f"{SAVE_DIR}/clustermap_final_swe_rosmap.png", dpi=300, bbox_inches='tight')
 
 # Boxplot & Presence:
 fig, (ax_box, ax_bar) = plt.subplots(
@@ -88,5 +88,5 @@ ax_bar.legend_.remove()
 
 plt.xticks(rotation=45, ha='right')
 plt.tight_layout()
-plt.savefig(f"{SAVE_DIR}/boxplot_presence_final_swe.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{SAVE_DIR}/boxplot_presence_final_swe_rosmap.png", dpi=300, bbox_inches='tight')
 print(f"Done! Figures saved in {SAVE_DIR}")
