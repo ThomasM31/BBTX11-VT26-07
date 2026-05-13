@@ -1,24 +1,29 @@
 # sklearn
+import datetime
 from sklearn.model_selection import cross_val_score, GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
 from sklearn.decomposition import PCA
 from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, roc_auc_score, roc_curve, accuracy_score, confusion_matrix, ConfusionMatrixDisplay
-import BINN.data_handling as dh
-import BINN.custom_train_test_split as ctts
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import numpy as np
 import os
+import shap
+import sys
 
 # anndata
 import anndata as ad
 from anndata.experimental import AnnCollection
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # Own files
 import BINN.custom_train_test_split as ctts
+import BINN.data_handling as dh
+
 
 def read_adata(indices: list, train_size=0.8):
     train_adata, test_adata, collection = ctts.pipeline(indices, data_path, train_size)
@@ -32,26 +37,33 @@ def xy_datasplit(train_adata: ad.AnnData, test_adata: ad.AnnData):
 
     return X_train, y_train, X_test, y_test
 
+import scipy.sparse
+
 def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     X_train, y_train, X_test, y_test = xy_datasplit(train_adata, test_adata)
 
-    # Support Vector Machine, icke-linjär
-    print("Creating model...")
-    clf_svm = SVC(C=1, 
-                  probability=True, 
-                  gamma=0.001, 
-                  kernel='rbf', 
-                  class_weight='balanced') 
+    # 1. FORCE DENSE IMMEDIATELY
+    # This completely eliminates all the Scipy Sparse crashes in Scaler and SHAP
+    if scipy.sparse.issparse(X_train):
+        X_train = X_train.toarray()
+    if scipy.sparse.issparse(X_test):
+        X_test = X_test.toarray()
 
-    # PCA TODO: testa utan
-    pca = PCA(n_components=50)
-    X_train_pca = pca.fit_transform(X_train)
-    X_test_pca = pca.transform(X_test)
+    print("Creating model...")
+    from sklearn.preprocessing import StandardScaler
+    
+    # 2. THE PIPELINE 
+    # Because the data is now dense, we can use the normal StandardScaler!
+    pipeline = Pipeline([
+        ('scaler', StandardScaler()), 
+        ('svm', SVC(kernel='linear', probability=True, class_weight='balanced', C=1))
+    ])
 
     print("Fitting to model now!")
-    clf_svm.fit(X_train_pca, y_train)
+    pipeline.fit(X_train, y_train)
     
-    y_scores = clf_svm.predict_proba(X_test_pca)[:, 1]
+    y_scores = pipeline.predict_proba(X_test)[:, 1]
+    y_pred = pipeline.predict(X_test)
 
     # ROC AUC 
     fpr, tpr, _ = roc_curve(y_test, y_scores, pos_label=1)
@@ -60,15 +72,11 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     
     # CV
     print("Cross validating now!")
-    scores = cross_val_score(clf_svm, X_train, y_train, cv=5, scoring='roc_auc')
+    scores = cross_val_score(pipeline, X_train, y_train, cv=5, scoring='roc_auc')
     print(f"CV Scores: {scores}")
     print(f"Mean CV AUC: {scores.mean():.4f}")
 
-    y_pred = clf_svm.predict(X_test_pca)
-    df_svm = pd.DataFrame({
-        'y_true': y_test, 
-        'y_prob': y_scores
-    })
+    df_svm = pd.DataFrame({'y_true': y_test, 'y_prob': y_scores})
     df_svm.to_csv("svm_test_results.csv", index=False)
     print("Saved: svm_test_results.csv")
 
@@ -78,12 +86,12 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
 
     # Confusion Matrix
     print("Saving confusion matrix..")
-    os.makedirs(SAVE_DIR, exist_ok=True) # Skapar mappen om den saknas
+    os.makedirs(SAVE_DIR, exist_ok=True) 
     cm = confusion_matrix(y_test, y_pred, normalize='true')
     cmap = plt.get_cmap('Blues')
     cmd = ConfusionMatrixDisplay(cm, display_labels=["Frisk", "AD"])
-    cmd.plot(cmap=cmap)#.figure_.savefig('confusion_matrix_SVM.png')
-    plt.title("Normaliserad förväxlingsmatris: SVM")
+    cmd.plot(cmap=cmap)
+    plt.title("Förväxlingsmatris (SVM)")
     plt.xlabel("Förutspådd etikett")
     plt.ylabel("Sann etikett")
     save_path = os.path.join(SAVE_DIR, 'confusion_matrix_SVM_swe.png')
@@ -94,6 +102,53 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     # Classification report 
     report = classification_report(y_test, y_pred, output_dict=True)
     print(report)
+
+    print("\n--- Starting SHAP Analysis ---")
+    gene_names = train_adata.var_names.tolist()
+
+    print("Scaling data for SHAP...")
+    X_train_scaled = pipeline.named_steps['scaler'].transform(X_train)
+    X_test_scaled = pipeline.named_steps['scaler'].transform(X_test)
+
+    print("Initializing LinearExplainer...")
+    # We pass the scaled background data directly
+    explainer = shap.LinearExplainer(pipeline.named_steps['svm'], X_train_scaled)
+    
+    print("Calculating SHAP values...")
+    shap_values = explainer.shap_values(X_test_scaled)
+    
+    # Handle SHAP output format (LinearExplainer sometimes returns lists, sometimes arrays)
+    if isinstance(shap_values, list):
+        shap_matrix = shap_values[1]
+    else:
+        shap_matrix = shap_values
+
+    print("Packaging data for modern beeswarm plot...")
+    
+    # Safely extract the base value (expected average prediction)
+    if isinstance(explainer.expected_value, (list, np.ndarray)):
+        base_value = explainer.expected_value[1] if len(explainer.expected_value) > 1 else explainer.expected_value[0]
+    else:
+        base_value = explainer.expected_value
+
+    # Package everything into a modern SHAP Explanation object
+    shap_explanation = shap.Explanation(
+        values=shap_matrix,                  
+        base_values=base_value,              
+        data=X_test_scaled,          
+        feature_names=gene_names  
+    )
+
+    print("Generating SHAP beeswarm plot...")
+    shap.plots.beeswarm(shap_explanation, show=False, max_display=11)
+    
+    shap_save_path = os.path.join(SAVE_DIR, 'shap_beeswarm_SVM' + datetime.datetime.now().strftime("_%Y%m%d_%H%M%S") + '.png')
+    plt.savefig(shap_save_path, bbox_inches='tight', dpi=300)
+    plt.close()
+    
+    print(f"SHAP figure saved: {shap_save_path}")
+    print("Baseline model complete!")    
+    
 
 # GLOBALS
 LABELS = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']

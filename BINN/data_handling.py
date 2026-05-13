@@ -13,8 +13,8 @@ print("------------------")
 
 # Own files
 import optuna
-from binn import BINN
-import binn_training as bt
+from BINN.binn import BINN
+import BINN.binn_training as bt
 
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
