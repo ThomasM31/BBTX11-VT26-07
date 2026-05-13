@@ -24,6 +24,20 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import BINN.custom_train_test_split as ctts
 import BINN.data_handling as dh
 
+import pipeline_paths as ppaths
+
+pp = ppaths.PipelinePaths(True, 'mg_200_mc_200_mhvg1000')
+result_save_path = pp.svm_results_path
+fig_save_path = pp.svm_results_path
+data_path = pp.compl_full_pipe_path
+mask_path = pp.mask_full_pipe_path
+MASK_PATHS = [mask_path / f"oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+            for i in range(5)]
+
+# GLOBALS
+LABELS = ['astro', 'exc1', 'exc2', 'exc3', 'immune', 'inhi', 'oligo', 'opcs', 'vasc']
+ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
+TRAIN_SIZE = 0.8
 
 def read_adata(indices: list, train_size=0.8):
     train_adata, test_adata, collection = ctts.pipeline(indices, data_path, train_size)
@@ -42,8 +56,6 @@ import scipy.sparse
 def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     X_train, y_train, X_test, y_test = xy_datasplit(train_adata, test_adata)
 
-    # 1. FORCE DENSE IMMEDIATELY
-    # This completely eliminates all the Scipy Sparse crashes in Scaler and SHAP
     if scipy.sparse.issparse(X_train):
         X_train = X_train.toarray()
     if scipy.sparse.issparse(X_test):
@@ -52,8 +64,6 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     print("Creating model...")
     from sklearn.preprocessing import StandardScaler
     
-    # 2. THE PIPELINE 
-    # Because the data is now dense, we can use the normal StandardScaler!
     pipeline = Pipeline([
         ('scaler', StandardScaler()), 
         ('svm', SVC(kernel='linear', probability=True, class_weight='balanced', C=1))
@@ -90,12 +100,11 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     cm = confusion_matrix(y_test, y_pred, normalize='true')
     cmap = plt.get_cmap('Blues')
     cmd = ConfusionMatrixDisplay(cm, display_labels=["Frisk", "AD"])
-    cmd.plot(cmap=cmap)
-    plt.title("Förväxlingsmatris (SVM)")
-    plt.xlabel("Förutspådd etikett")
-    plt.ylabel("Sann etikett")
-    save_path = os.path.join(SAVE_DIR, 'confusion_matrix_SVM_swe.png')
-    plt.savefig(save_path, dpi=300)
+    cmd.plot(cmap=cmap)#.figure_.savefig('confusion_matrix_SVM.png')
+
+    plt.title("Confusion Matrix (SVM)")
+    plt.savefig(fig_save_path / f'confusion_matrix_SVM_{date}.png')
+    print(f'Saved CM to {fig_save_path / f'confusion_matrix_SVM_{date}.png'}')
     plt.close()
     print(f"Figure saved: {save_path}")
 
