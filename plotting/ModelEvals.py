@@ -30,6 +30,7 @@ def load_scores(path: str, mode_binary: bool) -> Tuple[Optional[npt.NDArray[np.i
         df = pd.read_csv(path)
         y_true = df['y_true'].to_numpy(dtype=np.int_)
         if mode_binary:
+            if 'y_pred' not in df.columns: df['y_pred'] = df['y_prob'].round()
             y_prob = df['y_pred'].to_numpy(dtype=np.float64)
         else:
             y_prob = df['y_prob'].to_numpy(dtype=np.float64)
