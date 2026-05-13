@@ -103,10 +103,10 @@ def baseline_model(train_adata : ad.AnnData, test_adata: ad.AnnData):
     cmd.plot(cmap=cmap)#.figure_.savefig('confusion_matrix_SVM.png')
 
     plt.title("Confusion Matrix (SVM)")
-    plt.savefig(fig_save_path / f'confusion_matrix_SVM_{date}.png')
-    print(f'Saved CM to {fig_save_path / f'confusion_matrix_SVM_{date}.png'}')
+    plt.savefig(fig_save_path / f'confusion_matrix_SVM_{datetime.date}.png')
+    print(f'Saved CM to {fig_save_path / f'confusion_matrix_SVM_{datetime.date}.png'}')
     plt.close()
-    print(f"Figure saved: {save_path}")
+    print(f"Figure saved: {fig_save_path}")
 
     # Classification report 
     report = classification_report(y_test, y_pred, output_dict=True)
