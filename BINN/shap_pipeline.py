@@ -1,15 +1,15 @@
-import argparse
-import data_handling as dh
-import custom_train_test_split as ctts
+from BINN import data_handling as dh
+from BINN import custom_train_test_split as ctts
+from BINN import shap_explainer
 import torch
 import torch.nn as nn
-import shap_explainer
 import pandas as pd
+import anndata as ad
+import pickle
 from pathlib import Path
 import importlib.util
-import anndata as ad
+import argparse
 from datetime import datetime as dt
-import pickle
 
 # import module for consistent paths
 path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
@@ -42,12 +42,8 @@ BATCH_SIZE = 32
 ACTIVATION_FN = nn.Tanh()
 
 
-def pipeline(date: str,
-             to_include=list,
-             epochs=int, 
-             d_path=tt_data_path, 
-             m_paths=MASK_PATHS,
-             tune_hyperparameters=False
+def pipeline(date: str, 
+             m_paths=MASK_PATHS
              ):
     """
     Performs the full shap_pipeline(), including 
@@ -91,7 +87,7 @@ def pipeline(date: str,
     shap_filename = ttpaths.binn_model_path / f"shap_explanation_{date}.pkl"
     with open(shap_filename, 'wb') as f:
         pickle.dump(shap_explanation, f)
-
+    
     print("Creating layered SHAP...")
     shap_df = shap_explainer.layerwise_shap(model, X_train_tensor, X_test_tensor, masks, device)
     shap_filename = ttpaths.binn_model_path / f"shap_explanation_layered_{date}.pkl"
@@ -108,11 +104,6 @@ if __name__ == "__main__":
         type=str,
         help="format YYMMDD_HHMM"
     )
-
-    parser.add_argument(
-        "to_include", 
-        type=int, nargs='+', 
-        help="indices to include")
 
     # Optional argument tune_hyperparameters
     parser.add_argument(
@@ -133,8 +124,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Call pipeline with terminal arguments
-    pipeline(date=args.date,
-             to_include=args.to_include,
-             tune_hyperparameters=args.tune_hyperparameters,
-             epochs=args.epochs,
-             )
+    pipeline(date=args.date)
