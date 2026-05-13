@@ -20,23 +20,23 @@ top_20_proteins = df_shap.abs().mean().sort_values(ascending=False).head(20).ind
 df_expr_full = pd.read_csv(EXPR_PATH)
 df_results = pd.read_csv(RESULTS_PATH) 
 
-# Labels: 1.0 -> High (red), 0.0 -> Low (blue)
-severity_labels = df_results['y_true'].map({1.0: 'Hög svårighetsgrad', 0.0: 'Låg svårighetsgrad'})
+# Labels: 1.0 -> (red), 0.0 -> (blue)
+severity_labels = df_results['y_true'].map({1.0: 'AD', 0.0: 'Frisk'})
 print(f"Data loaded. Found {len(top_20_proteins)} top proteins.")
 
 # Colors: 
-HUE_ORDER = ['Hög svårighetsgrad', 'Låg svårighetsgrad']
+HUE_ORDER = ['AD', 'Frisk']
 COLOR_PALETTE = ['red', 'blue']
 DOT_PALETTE = ['darkred', 'darkblue']
 
 # config clustermap
 df_top20 = df_expr_full[top_20_proteins]
-severity_colors = severity_labels.map({'Hög svårighetsgrad': 'red', 'Låg svårighetsgrad': 'blue'})
+severity_colors = severity_labels.map({'AD': 'red', 'Frisk': 'blue'})
 
 # config  boxplot (long-format)
 df_melted = df_top20.copy()
-df_melted['Svårighetsgrad'] = severity_labels
-df_long = df_melted.melt(id_vars='Svårighetsgrad', var_name='Protein', value_name='Kvantitet')
+df_melted['Sjukdomsstatus'] = severity_labels
+df_long = df_melted.melt(id_vars='Sjukdomsstatus', var_name='Protein', value_name='Kvantitet')
 
 print("Generating plots...")
 
@@ -62,24 +62,24 @@ fig, (ax_box, ax_bar) = plt.subplots(
 )
 
 sns.boxplot(
-    data=df_long, x='Protein', y='Kvantitet', hue='Svårighetsgrad',
+    data=df_long, x='Protein', y='Kvantitet', hue='Sjukdomsstatus',
     hue_order=HUE_ORDER, palette=COLOR_PALETTE,
     ax=ax_box, showfliers=False
 )
 sns.stripplot(
-    data=df_long, x='Protein', y='Kvantitet', hue='Svårighetsgrad',
+    data=df_long, x='Protein', y='Kvantitet', hue='Sjukdomsstatus',
     hue_order=HUE_ORDER, palette=DOT_PALETTE,
     ax=ax_box, dodge=True, alpha=0.3, legend=False
 )
 ax_box.set_ylabel("Skalad proteinkvantitet (Z-score)")
-ax_box.set_title("Distribution av de viktigaste proteinerna per svårighetsgrad")
+ax_box.set_title("Distribution av de viktigaste proteinerna per AD-status")
 
 # Underpanel: Närvaroandel
-presence = df_melted.groupby('Svårighetsgrad').agg(lambda x: (x > 0).mean()).reset_index()
-df_presence_long = presence.melt(id_vars='Svårighetsgrad', var_name='Protein', value_name='Andel')
+presence = df_melted.groupby('Sjukdomsstatus').agg(lambda x: (x > 0).mean()).reset_index()
+df_presence_long = presence.melt(id_vars='Sjukdomsstatus', var_name='Protein', value_name='Andel')
 
 sns.barplot(
-    data=df_presence_long, x='Protein', y='Andel', hue='Svårighetsgrad',
+    data=df_presence_long, x='Protein', y='Andel', hue='Sjukdomsstatus',
     hue_order=HUE_ORDER, palette=COLOR_PALETTE, ax=ax_bar
 )
 ax_bar.set_ylabel("Närvaroandel")
