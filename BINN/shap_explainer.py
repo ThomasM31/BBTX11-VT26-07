@@ -15,7 +15,7 @@ def perform_shap(
         X_test_tensor: torch.Tensor,
         gene_names: list[str],
         figpath: Path,
-        stage: str,
+        dataset: str,
         date: str
         ) -> None:
     
@@ -87,20 +87,14 @@ def perform_shap(
         feature_names=gene_names  
     )
 
-    date = dt.now().strftime("%y%m%d_%H%M")
-
     # Save rawdata for figures:
     # E.g. the SHAP-matrix (importance for each gene per patient)
     shap_df = pd.DataFrame(shap_matrix, columns=gene_names)
-    shap_df.to_csv(figpath / f'real_shap_values_{date}.csv', index=False)
+    shap_df.to_csv(figpath / f'real_shap_values_{stage}_{date}.csv', index=False)
     raw_expr_df = pd.DataFrame(test_patients.cpu().numpy(), columns=gene_names)
-    raw_expr_df.to_csv(figpath / f'real_expression_values_{date}.csv', index=False)
+    raw_expr_df.to_csv(figpath / f'real_expression_values_{stage}_{date}.csv', index=False)
     
     print(f"Data saved to CSV in: {figpath}")
-
-    
-
-    print(f"Plots saved to: \n {figpath}")
 
 
 def layerwise_shap(model, X_train_tensor, X_test_tensor, masks, device):
