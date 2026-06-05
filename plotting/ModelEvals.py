@@ -63,9 +63,9 @@ def draw_roc(ax, binn_data, svm_data):
         ax.fill_between(fpr, ci[0], ci[1], color=color, alpha=0.1)
     
     ax.plot([0, 1], [0, 1], "k--", lw=0.5)
-    ax.set_title("ROC-kurva: Global evaluering")
-    ax.set_xlabel("1 - specificitet")
-    ax.set_ylabel("Sensitivitet")
+    ax.set_title("ROC-curve: Global evaluation")
+    ax.set_xlabel("1 - specificity")
+    ax.set_ylabel("Sensitivity")
     ax.legend(fontsize=8)
 
 def draw_confusion(ax, y_t:npt.NDArray[np.int_], y_s: npt.NDArray[np.float64], label:str):
@@ -79,11 +79,11 @@ def draw_confusion(ax, y_t:npt.NDArray[np.int_], y_s: npt.NDArray[np.float64], l
             color = "white" if cm[i,j] > 0.5 else "black"
             ax.text(j, i, f"{cm[i,j]:.2f}", ha="center", va="center", color=color)
             
-    ax.set_title(f"Normaliserad förväxlingsmatris: {label}")
-    ax.set_xticks([0, 1], ["Frisk", "AD"])
-    ax.set_yticks([0, 1], ["Frisk", "AD"])
-    ax.set_xlabel("Förutspådd etikett")
-    ax.set_ylabel("Sann etikett")
+    ax.set_title(f"Normalized confusion matrix: {label}")
+    ax.set_xticks([0, 1], ["Healthy", "AD"])
+    ax.set_yticks([0, 1], ["Healthy", "AD"])
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
 
 def run_roc(binn_path: str, svm_path: str, labels: list[str] = ['']):
     # Orchestrate the loading and plotting process
@@ -97,7 +97,7 @@ def run_roc(binn_path: str, svm_path: str, labels: list[str] = ['']):
         draw_roc(axes, (y_t_binn, y_s_binn), (y_t_svm, y_s_svm))
         
         plt.tight_layout()
-        save_path = os.path.join(SAVE_DIR, "global_binn_evaluation_swe.png")
+        save_path = os.path.join(SAVE_DIR, "global_binn_evaluation_en.png")
         plt.savefig(save_path, dpi=300)
         print(f"Evaluation complete. Figure saved to: {save_path}")
     else:
@@ -125,6 +125,6 @@ if __name__ == "__main__":
     gen_path = '/data/shared/alzgene26/data/results/binn_results/gen_test_results_260508_0940_conv.csv'
     run_roc(binn_path, svm_path)
     
-    #run_CM(svm_path, 'svm_evaluation_swe_260512_0806.png', 'SVM (ROSMAP)')
-    #run_CM(binn_path, 'binn_evaluation_swe.png', 'BINN (ROSMAP)')
-    #run_CM(gen_path, 'swdbb_evaluation_swe.png', 'BINN (SWDBB)')
+    run_CM(svm_path, 'svm_evaluation_en_260512_0806.png', 'SVM (ROSMAP)')
+    run_CM(binn_path, 'binn_evaluation_en.png', 'BINN (ROSMAP)')
+    run_CM(gen_path, 'swdbb_evaluation_en.png', 'BINN (SWDBB)')

@@ -9,7 +9,6 @@ import logging
 import re
 from bokeh.models import LinearColorMapper, ColorBar, FixedTicker
 hv.extension('bokeh')
-#hv.help(hv.Sankey)
 
 
 import pipeline_paths as ppaths
@@ -279,11 +278,8 @@ def plot_sankey(
     palette = [mcolors.to_hex(c) for c in cmap(np.linspace(0, 1, n_steps))]
 
     def get_color(val, name):
-        if name and "Other" in str(name): 
+        if name and ("Other" in str(name) or "output_node" in str(name)): 
             return '#D3D3D3' # Grey
-        
-        if name and "output_node" in str(name): 
-            return '#333333' # Dark Grey/Black
         
         norm_val = (np.clip(val, -max_val, max_val) + max_val) / (2 * max_val)
 
@@ -305,31 +301,21 @@ def plot_sankey(
     
     node_imp['label'] = node_imp['index'].apply(lambda x: x.split('_L')[0] if '_L' in str(x) else x)
     
-    '''max_layer = node_imp['layer'].max()
-    node_imp['label'] = node_imp.apply(
-        lambda row: output_node_label if (
-            row['layer'] == max_layer and 
-            (row['label'] == 'output_node' or 'Other in Layer' in row['label'])
-        ) else row['label'], axis=1
-    )'''
-
     max_layer = node_imp['layer'].max()
 
     def process_label(row):
         # Global toggle for no labels
+        logging.info("Processing label")
         if no_labels:
             return ' '
         
         current_label = str(row['label'])
         current_layer = row['layer']
 
-        # Specific replacement for the final layer (Layer 5/Max Layer)
-        if current_layer == max_layer and (current_label == 'output_node' or 'Other in Layer' in current_label) :
+        if current_label == 'output_node':
             return output_node_label
-        
-        if 'Other in Layer' in current_label and current_layer != max_layer:
-            layer_num = current_label.split('Layer ')[-1]
-            return f'Övriga i lager {layer_num}'
+        elif current_layer == max_layer and 'Other in Layer' in current_label:
+            return output_node_label
         
         return current_label
 
@@ -338,9 +324,6 @@ def plot_sankey(
     if not no_labels:
         node_imp['label'] = node_imp['label'].apply(lambda x: readable_labels.get(x, x))
         node_imp['label'] = node_imp['label'].apply(lambda x: wrap(x, 3))
-
-    #node_imp['label'] = node_imp['label'].apply(lambda x: readable_labels.get(x, x))
-    #node_imp['label'] = node_imp['label'].apply(lambda x: wrap(x, 3)) # Shorter wrap for subnets
 
     node_imp = node_imp.sort_values('layer').reset_index(drop=True)
 
@@ -417,28 +400,28 @@ def plot_sankey(
         opts.Layout(shared_axes=False, merge_tools=False)
     )
 
+    layout = sankey_obj
+
     hv.save(layout, filename, backend='bokeh')
     return layout
 
 
 shap_data = pd.read_pickle('/data/shared/alzgene26/data/results/binn_model/shap_explanation_layered_260508_0940.pkl')
 
-#plot_sankey(shap_data, 10, save_path / 'sankey_top_10.html', output_node_label='alzheimer')
+plot_sankey(shap_data, 10, save_path / 'sankey_top_10.html', output_node_label='AD')
 
-'''
 genes: list[tuple[str, int]] = [('UBB', 10), ('UBC', 10), ('PSMA1', 10), ('FYN', 10), ('ERBB4', 10)]
 for gene, n_top in genes:
     downstream_df = get_subnetwork(shap_data, gene, direction='downstream')
     fname_label = format_fname_label(gene)
     plot_sankey(
-    downstream_df, 
+        downstream_df, 
         n_top=n_top, 
-        filename=save_path / f'plots/{fname_label}_downstream.html', 
+        filename=save_path / f'{fname_label}_downstream.html',
+        output_node_label='AD'
     )
-'''
 
-draw_upstream: list[tuple[str, int]] = [('R-HSA-162582', 10), ('R-HSA-69278', 10), ('R-HSA-5693606', 10), ('R-HSA-1500620', 10), ("R-HSA-5693606", 10)]
-draw_upstream: list[tuple[str, int]] = [('R-HSA-8953854', 10)]
+draw_upstream: list[tuple[str, int]] = [('R-HSA-8953854', 10), ('R-HSA-162582', 10), ('R-HSA-69278', 10), ('R-HSA-5693606', 10), ('R-HSA-1500620', 10), ("R-HSA-5693606", 10), ("R-HSA-1640170",10)]
 for process, n_top in draw_upstream:
     df: pd.DataFrame = get_subnetwork(shap_data, process, direction='upstream')
     fname_label = format_fname_label(readable_labels[process])
@@ -451,8 +434,7 @@ for process, n_top in draw_upstream:
     )
 
 
-
-'''draw_downstream: list[tuple[str, int]] = [('R-HSA-69278', 10)]
+draw_downstream: list[tuple[str, int]] = [('R-HSA-69278', 10)]
 for process, n_top in draw_downstream:
     df: pd.DataFrame = get_subnetwork(shap_data, process, direction='downstream')
     fname_label = format_fname_label(readable_labels[process])
@@ -462,50 +444,4 @@ for process, n_top in draw_downstream:
         n_top=n_top, 
         filename=save_path / f'{fname_label}_downstream_subnetwork.html',
         output_node_label=readable_label
-    )'''
-
-'''
-target = "R-HSA-69278" # cell cycle, meiotic
-readable_label = readable_labels[target]
-
-upstream_df = extract_process_lineage(shap_data, target, direction='upstream')
-downstream_df = extract_process_lineage(shap_data, target, direction='downstream')
-
-# full lineage up- and downstream for a specific process 
-bidirectional_df = get_bidirectional_subnetwork(shap_data, target)
-plot_sankey(
-    bidirectional_df, 
-    n_top=100, 
-    filename=save_path / 'meiosis_bidirectional_analysis.html', 
-    is_subnetwork_plot=True
     )
-
-plot_sankey(
-    upstream_df, 
-    n_top=15, 
-    filename=save_path / 'meiosis_upstream_analysis.html', 
-    is_subnetwork_plot=True, 
-    output_node_label=readable_label
-    )
-
-target = "R-HSA-5693606" # DNA double strand break response
-readable_label = readable_labels[target]
-bidirectional_df = get_bidirectional_subnetwork(shap_data, target)
-plot_sankey(
-    bidirectional_df, 
-    n_top=100, 
-    filename=save_path / f'{readable_label}_bidirectional_analysis.html', 
-    is_subnetwork_plot=True
-    )
-
-target = "R-HSA-162582" # Signal Transduction
-readable_label = readable_labels[target]
-upstream_df = extract_process_lineage(shap_data, target, direction='upstream')
-plot_sankey(
-    upstream_df, 
-    n_top=10, 
-    filename=save_path / 'signal_transduction_upstream_analysis.html', 
-    is_subnetwork_plot=True, 
-    output_node_label=readable_label
-    )
-'''
