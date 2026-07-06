@@ -27,5 +27,3 @@ All associated with **Chalmers University of Technology**
 - Kasper Edblad, Software Engineering
 - Thomas Mathiassen, Software Engineering
 - Lucas Antonsson, Biomedical Engineering
-- Simon Wåhlström, Engineering Mathematics
-- Valentino Tong, Engineering Mathematics
