@@ -10,3 +10,4 @@ scikit-learn
 scipy
 shap
 optuna
+shap_explainer
