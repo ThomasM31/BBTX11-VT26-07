@@ -1,0 +1,40 @@
+------------------------------------------------------------
+TASK ID: 
+STARTING: Tue Jul 14 03:45:34 AM CEST 2026
+NODE: 
+------------------------------------------------------------
+Reading full seaAD-data
+Successfully read and saved 1357145 cells
+Data information: 
+
+AnnData object with n_obs × n_vars = 1357145 × 36601
+    obs: 'sample_id', 'Neurotypical reference', 'Donor ID', 'Organism', 'Brain Region', 'Sex', 'Gender', 'Age at Death', 'Race (choice=White)', 'Race (choice=Black/ African American)', 'Race (choice=Asian)', 'Race (choice=American Indian/ Alaska Native)', 'Race (choice=Native Hawaiian or Pacific Islander)', 'Race (choice=Unknown or unreported)', 'Race (choice=Other)', 'specify other race', 'Hispanic/Latino', 'Highest level of education', 'Years of education', 'PMI', 'Fresh Brain Weight', 'Brain pH', 'Overall AD neuropathological Change', 'Thal', 'Braak', 'CERAD score', 'Overall CAA Score', 'Highest Lewy Body Disease', 'Total Microinfarcts (not observed grossly)', 'Total microinfarcts in screening sections', 'Atherosclerosis', 'Arteriolosclerosis', 'LATE', 'Cognitive Status', 'Last CASI Score', 'Interval from last CASI in months', 'Last MMSE Score', 'Interval from last MMSE in months', 'Last MOCA Score', 'Interval from last MOCA in months', 'APOE Genotype', 'Primary Study Name', 'Secondary Study Name', 'NeuN positive fraction on FANS', 'RIN', 'cell_prep_type', 'facs_population_plan', 'rna_amplification', 'sample_name', 'sample_quantity_count', 'expc_cell_capture', 'method', 'pcr_cycles', 'percent_cdna_longer_than_400bp', 'rna_amplification_pass_fail', 'amplified_quantity_ng', 'load_name', 'library_prep', 'library_input_ng', 'r1_index', 'avg_size_bp', 'quantification_fmol', 'library_prep_pass_fail', 'exp_component_vendor_name', 'batch_vendor_name', 'experiment_component_failed', 'alignment', 'Genome', 'ar_id', 'bc', 'GEX_Estimated_number_of_cells', 'GEX_number_of_reads', 'GEX_sequencing_saturation', 'GEX_Mean_raw_reads_per_cell', 'GEX_Q30_bases_in_barcode', 'GEX_Q30_bases_in_read_2', 'GEX_Q30_bases_in_UMI', 'GEX_Percent_duplicates', 'GEX_Q30_bases_in_sample_index_i1', 'GEX_Q30_bases_in_sample_index_i2', 'GEX_Reads_with_TSO', 'GEX_Sequenced_read_pairs', 'GEX_Valid_UMIs', 'GEX_Valid_barcodes', 'GEX_Reads_mapped_to_genome', 'GEX_Reads_mapped_confidently_to_genome', 'GEX_Reads_mapped_confidently_to_intergenic_regions', 'GEX_Reads_mapped_confidently_to_intronic_regions', 'GEX_Reads_mapped_confidently_to_exonic_regions', 'GEX_Reads_mapped_confidently_to_transcriptome', 'GEX_Reads_mapped_antisense_to_gene', 'GEX_Fraction_of_transcriptomic_reads_in_cells', 'GEX_Total_genes_detected', 'GEX_Median_UMI_counts_per_cell', 'GEX_Median_genes_per_cell', 'Multiome_Feature_linkages_detected', 'Multiome_Linked_genes', 'Multiome_Linked_peaks', 'ATAC_Confidently_mapped_read_pairs', 'ATAC_Fraction_of_genome_in_peaks', 'ATAC_Fraction_of_high_quality_fragments_in_cells', 'ATAC_Fraction_of_high_quality_fragments_overlapping_TSS', 'ATAC_Fraction_of_high_quality_fragments_overlapping_peaks', 'ATAC_Fraction_of_transposition_events_in_peaks_in_cells', 'ATAC_Mean_raw_read_pairs_per_cell', 'ATAC_Median_high_quality_fragments_per_cell', 'ATAC_Non-nuclear_read_pairs', 'ATAC_Number_of_peaks', 'ATAC_Percent_duplicates', 'ATAC_Q30_bases_in_barcode', 'ATAC_Q30_bases_in_read_1', 'ATAC_Q30_bases_in_read_2', 'ATAC_Q30_bases_in_sample_index_i1', 'ATAC_Sequenced_read_pairs', 'ATAC_TSS_enrichment_score', 'ATAC_Unmapped_read_pairs', 'ATAC_Valid_barcodes', 'Number of mapped reads', 'Number of unmapped reads', 'Number of multimapped reads', 'Number of reads', 'Number of UMIs', 'Genes detected', 'Doublet score', 'Fraction mitochondrial UMIs', 'Severely Affected Donor', 'Class', 'Subclass', 'Supertype', 'Used in analysis'
+    var: 'gene_ids', 'feature_types', 'genome'
+    uns: 'Brain Region_colors', 'Great Apes Metadata', 'Subclass_colors', 'Supertype_colors', 'UW Clinical Metadata', 'X_normalization', 'batch_condition', 'default_embedding', 'title'
+    obsm: 'X_scVI', 'X_umap'
+    layers: 'UMIs', None
+Data example: 
+
+                                                                                     sample_id  ...  Used in analysis
+exp_component_name                                                                              ...                  
+AAACCCAAGCGTCTGC-L8TX_210805_01_B03-1153814324  AAACCCAAGCGTCTGC-L8TX_210805_01_B03-1153814324  ...              True
+AAACCCAAGTGGTTAA-L8TX_210805_01_B03-1153814324  AAACCCAAGTGGTTAA-L8TX_210805_01_B03-1153814324  ...              True
+AAACCCACATCCGAAT-L8TX_210805_01_B03-1153814324  AAACCCACATCCGAAT-L8TX_210805_01_B03-1153814324  ...              True
+AAACCCACATCTAACG-L8TX_210805_01_B03-1153814324  AAACCCACATCTAACG-L8TX_210805_01_B03-1153814324  ...              True
+AAACCCAGTATTTCTC-L8TX_210805_01_B03-1153814324  AAACCCAGTATTTCTC-L8TX_210805_01_B03-1153814324  ...              True
+
+[5 rows x 130 columns]
+Columns: 
+
+Index(['sample_id', 'Neurotypical reference', 'Donor ID', 'Organism',
+       'Brain Region', 'Sex', 'Gender', 'Age at Death', 'Race (choice=White)',
+       'Race (choice=Black/ African American)',
+       ...
+       'Number of reads', 'Number of UMIs', 'Genes detected', 'Doublet score',
+       'Fraction mitochondrial UMIs', 'Severely Affected Donor', 'Class',
+       'Subclass', 'Supertype', 'Used in analysis'],
+      dtype='object', length=130)
+Sparse AnnData: 1357145 n_obs x 36601 n_vars
+------------------------------------------------------------
+FINISHED: Tue Jul 14 03:53:47 AM CEST 2026
+------------------------------------------------------------

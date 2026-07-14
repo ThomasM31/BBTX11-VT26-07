@@ -6,3 +6,4 @@
 .vscode
 .venv/
 preprocessing/test.py
+!/seaAD/logs/248051_4294967294.out
