@@ -51,7 +51,7 @@ def pipeline(
     print('Selecting training subjects.')
     path = pp.metadata_path / 'individual_metadata_deidentified.tsv'
     metadata = pd.read_csv(path, sep='\t')
-    md_sel = metadata[['subject', 'Pathologic_diagnosis_of_AD']]
+    md_sel = metadata[['subject', 'msex', 'age_death', 'Pathologic_diagnosis_of_AD']]
     
     # train-test split (equal fraction AD, non-AD in datasets)
     train_df, test_df = train_test_split(
