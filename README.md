@@ -15,7 +15,7 @@ Nu kör vi!
   number = {...},
   journal = {....},
   publisher = {...},
-  author = {Nordmark, Isabell and Mathiassen, Thomas and Edblad, Kasper and Antonsson, Lucas and Wåhlström,  Simon and Tong, Valentino},
+  author = {Nordmark, Isabell and Mathiassen, Thomas and Edblad, Kasper and Antonsson, Lucas},
   year = {2026},
   month = ... 
 }
