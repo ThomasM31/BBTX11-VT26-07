@@ -31,9 +31,11 @@ def read_files(datasets: dict, filepath: Path) -> dict:
     files = {'astro'  : 'Astrocytes.h5ad',
              'exc1'   : 'Excitatory_neurons_set1.h5ad',
              'exc2'   : 'Excitatory_neurons_set2.h5ad',
-             'exc3'   : 'Excitatory_neurons_set3.h5ad',   
+             'exc3'   : 'Excitatory_neurons_set3.h5ad',
+             'exc_combined' : 'Exc_combined.h5ad',  
              'immune' : 'Immune_cells.h5ad',   
-             'inhi'   : 'Inhibitory_neurons.h5ad',   
+             'inhi'   : 'Inhibitory_neurons.h5ad',
+             'inh_combined' : 'Inh_combined.h5ad',   
              'oligo'  : 'Oligodendrocytes.h5ad',   
              'opcs'   : 'OPCs.h5ad',
              'vasc'   : 'Vasculature_cells.h5ad'}
@@ -91,22 +93,28 @@ def write_gene_expr_count(datasets: dict, filepath: Path) -> None:
         sc.pp.filter_genes(adata, min_cells=0)
         counts = adata.var['n_cells'].tolist()
 
-        f = filepath / f'{label}.csv'
+        f = filepath / f'gene_count_{label}.csv'
+        print(f)
         adata.var['n_cells'].to_csv(f)
-    print(f'Gene expression counts saved to: {f}')
+        print(f'Gene expression counts saved to: {f}')
 
 def read_gene_expr_count(included_labels: list[str], filepath: Path) -> list:
     files = []
     for label in included_labels:
-        f = f'{label}.csv'
+        f = f'gene_count_{label}.csv'
         if (filepath / f).exists():
             files.append(f)
+            print(f'{f} is to be read')
+        else:
+            print(f'Cannot read gene expr count for {label}, file not found')
 
     counts_list = []
+    print(files)
     for file in files:
         to_read = filepath / file
         counts = pd.read_csv(to_read, index_col=0).iloc[:, 0]
         counts_list.append(counts)
+        #print(f'counts for {label}: {counts_list}')
     return counts_list
 
 def sum_gene_expr_counts(
@@ -120,7 +128,7 @@ def sum_gene_expr_counts(
     Writes a file of all genes expressed in at least 'min_cells' cells.
     '''
     counts_list = read_gene_expr_count(included_labels, filepath_from)
-
+    print(f'{counts_list}')
     # sum counts and list all that are expressed in more than at least min_cells
     total_counts = pd.concat(counts_list, axis = 1).sum(axis = 1)
     genes_to_keep = total_counts[total_counts >= min_cells].index
@@ -140,6 +148,7 @@ def get_expressed_genes(
     '''
     to_read = filepath / f'genes_to_keep_{min_cells}.csv'
     expressed_genes = pd.read_csv(to_read)
+
     return expressed_genes['gene_ids'].tolist()
 
 
@@ -171,7 +180,7 @@ def save_reactome_genes(
                 pathway_genes = parts[2:]
                 for gene in pathway_genes:
                     reactome_genes.add(gene)
-    
+
     with open(filepath / filename_save, 'w') as output:
         for gene in reactome_genes:
             output.write(str(gene) + '\n')
@@ -239,12 +248,16 @@ def find_common_hvgs(
         f = filepath_from / f'{label}.csv'
         if (f).exists():
             rel_files.append(f)
+
+    print(f'rel files: {rel_files}')
     
     dataframes: list[pd.DataFrame] = []
     for file in rel_files:
         temp_df = pd.read_csv(file, index_col='gene')
         temp_df.columns = [file.stem]
         dataframes.append(temp_df)
+
+    print(f'len of dataframes is {len(dataframes)}')
     
     combined_df = pd.concat(dataframes, axis=1)
     combined_df['avg_variance'] = combined_df.mean(axis=1)
