@@ -10,3 +10,5 @@ scikit-learn
 scipy
 shap
 optuna
+jupyterlab
+scikit-misc

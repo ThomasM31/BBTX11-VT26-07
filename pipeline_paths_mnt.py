@@ -1,5 +1,8 @@
 from pathlib import Path
 import os
+from typing import Literal
+
+
 
 class PipelinePaths:
 
@@ -9,26 +12,59 @@ class PipelinePaths:
             if isinstance(attr, Path):
                 attr.mkdir(parents=True, exist_ok=True)
 
+    DirMode = Literal["shared", "dev", "dev_local", "alzgene26"]
+
     def __init__(self, 
-                 shared_dir_mode: bool, 
+                 dir_mode: DirMode = "shared",
                  full_pipeline_run_vars: str = '',
                  pseudo_non_hvg_run_vars: str = '',
                  hvg_non_pseudo_run_vars: str = ''
                  ) -> None:
 
-        if shared_dir_mode:
-            # To read from and write to the shared folder
+        def get_project_root() -> Path:
+            current = Path(__file__).resolve()
+            for parent in [current] + list(current.parents):
+                if (parent / '12tb_dsk3').is_dir():
+                    return parent
+            raise FileNotFoundError("Could not find project root containing '12tb_dsk3'")
+
+        # Get root and target folder
+        if dir_mode == "shared" or dir_mode == "dev":
+            root_dir = get_project_root()
+            dsk_folder = root_dir / "12tb_dsk3"
+
+        if dir_mode == "shared":
+            # To read from and write to the shared folder (on mnt)
+            base_path = Path(dsk_folder) / "workspaces"  
+            data_path = base_path / "shared" / "data"
+        elif dir_mode == "dev":
+            ### To read from and write to current users folders (on mnt)
+            user = str(os.environ.get('USER')) or str(os.environ.get('USERNAME'))
+            base_path = Path(dsk_folder) / "workspaces"  
+            data_path = base_path / user
+        elif dir_mode == "dev_local":
+            ### When using simulated (small, non-sensitive) data for local dev work
+            base_dir = (Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd().parent)
+            base_path = base_dir / "simulated"
+            data_path = base_path / "data"
+        elif dir_mode == "alzgene26":
             base_path = Path("/data/shared/alzgene26") 
             data_path = base_path / "data"
         else:
-            ### To read from and write to current users folders
-            user = str(os.environ.get('USER')) or str(os.environ.get('USERNAME'))
-            data_path = Path("/data/users") / user / "kand/data/"
+            raise ValueError(
+                f"Invalid dir_mode '{dir_mode}'. Expected one of: shared, dev, dev_local, alzgene26."
+            )           
+
+        print(f'base path found ({base_path}): {base_path.exists()}')
+        print(f'data path found ({data_path}): {data_path.exists()}')
 
         processed_data = "processed_data"
 
         # base experimental data before preprocessing
-        self.conv_data_path       = data_path / "conv_data"
+        self.conv_data_path       = data_path / "raw_data"
+        if dir_mode == "alzgene26":
+            self.conv_data_path       = data_path / "conv_data"
+        
         # AD status, age etc
         self.metadata_path        = data_path / "supplementary_data"
 
@@ -37,6 +73,7 @@ class PipelinePaths:
         self.genes_keep_path      = data_path / processed_data / "filter_genes"
         self.hvg_lists_path       = data_path / processed_data / "hvg_lists"
         self.hvg_common_path      = data_path / processed_data / "hvg_common"
+        self.stratified_path      = data_path / processed_data / "stratified"
         
         # to save umaps
         self.figures_path         = data_path / "figures"
