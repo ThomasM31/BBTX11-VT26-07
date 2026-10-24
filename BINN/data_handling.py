@@ -12,14 +12,14 @@ for p in sys.path:
 print("------------------")
 
 # Own files
-import optuna
-from .binn import BINN
-from . import binn_training as bt
+sys.path.append(os.path.abspath("..")) # so we can import binn, binn_training
+from binn import BINN
+import binn_training as bt
 
+import optuna
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
 from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, classification_report
-import os
 import pandas as pd, numpy as np
 from scipy.sparse import csr_matrix
 import torch.nn as nn
@@ -29,10 +29,9 @@ from sklearn.model_selection import StratifiedKFold
 import scipy
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
-from pathlib import Path
-import importlib.util
 
 # import module for consistent paths
+import importlib.util
 path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
 spec = importlib.util.spec_from_file_location("ppaths", path)
 ppaths = importlib.util.module_from_spec(spec)

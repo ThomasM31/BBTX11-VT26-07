@@ -1,6 +1,9 @@
 import torch
 from anndata.experimental import AnnLoader
-from .binn import BINN
+import sys
+import os
+sys.path.append(os.path.abspath("..")) # so we can import binn
+from binn import BINN
 import torch.nn as nn
 import torch.optim
 import pandas as pd
