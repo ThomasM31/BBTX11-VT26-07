@@ -29,20 +29,6 @@ spec = importlib.util.spec_from_file_location("ppaths", path)
 ppaths = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ppaths)
 
-# PATHS
-#run_vars = 'mg_200_mc_200_mhvg1000'
-#pp = ppaths.PipelinePaths("dev_local", full_pipeline_run_vars=run_vars)
-#
-#data_path = pp.compl_full_pipe_path
-#mask_path = pp.mask_full_pipe_path
-#
-## GLOBALS
-#MASK_PATHS = [mask_path / f"oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
-#            for i in range(5)]
-#EPOCHS = 40
-#TRAIN_SIZE = 0.8
-#ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
-
 
 def data_concatenate(acollection : AnnCollection):
     """
