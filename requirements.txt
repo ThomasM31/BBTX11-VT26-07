@@ -1,7 +1,7 @@
 scanpy
 anndata
 numpy
-pandas
+pandas<3
 matplotlib
 torch
 torchvision

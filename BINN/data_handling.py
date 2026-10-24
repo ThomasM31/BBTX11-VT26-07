@@ -3,14 +3,6 @@ import sys
 from pathlib import Path
 from datetime import datetime as dt
 
-print("--- DEBUG INFO ---")
-print(f"Current File: {__file__}")
-print(f"Current Working Directory: {os.getcwd()}")
-print("Python Path:")
-for p in sys.path:
-    print(f"  {p}")
-print("------------------")
-
 # Own files
 sys.path.append(os.path.abspath("..")) # so we can import binn, binn_training
 from binn import BINN
@@ -32,22 +24,24 @@ import matplotlib.pyplot as plt
 
 # import module for consistent paths
 import importlib.util
-path = Path(__file__).resolve().parent.parent / "pipeline_paths.py"
+path = Path(__file__).resolve().parent.parent / "pipeline_paths_mnt.py"
 spec = importlib.util.spec_from_file_location("ppaths", path)
 ppaths = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ppaths)
 
 # PATHS
-pp = ppaths.PipelinePaths(True, 'mg_200_mc_200_mhvg1000')
-data_path = pp.compl_full_pipe_path
-mask_path = pp.mask_full_pipe_path
-
-# GLOBALS
-MASK_PATHS = [mask_path / f"oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
-            for i in range(5)]
-EPOCHS = 40
-TRAIN_SIZE = 0.8
-ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
+#run_vars = 'mg_200_mc_200_mhvg1000'
+#pp = ppaths.PipelinePaths("dev_local", full_pipeline_run_vars=run_vars)
+#
+#data_path = pp.compl_full_pipe_path
+#mask_path = pp.mask_full_pipe_path
+#
+## GLOBALS
+#MASK_PATHS = [mask_path / f"oligo_exc3_exc2_vasc_immune_astro_inhi_opcs_exc1_layer_{i}_mask.csv" 
+#            for i in range(5)]
+#EPOCHS = 40
+#TRAIN_SIZE = 0.8
+#ALL_CELLTYPES = [0,1,2,3,4,5,6,7,8]
 
 
 def data_concatenate(acollection : AnnCollection):
@@ -364,48 +358,62 @@ def scaling_no_leakage(train_adata: ad.AnnData, test_adata: ad.AnnData) -> tuple
 
     return train_adata, test_adata
 
-def rollup_to_patient_level(datasets: dict) -> dict:
+def rollup_to_patient_level(datasets: dict, 
+                            label_col: str = 'label', 
+                            label_map: dict = None, 
+                            keep_unmapped: bool = False) -> dict:
     """
-    Pseudobulk per patient only
+    Pseudobulk per patient only.
+    Maps label_col to a numeric AD_status via label_map (default AD=1, NCI=0).
+    Rows with labels not in label_map are dropped, unless keep_unmapped=True,
+    in which case they are kept with AD_status = NaN (e.g. MCIP for inference only).
     """
+    label_map = {'NCI': 0.0, 'AD': 1.0} if label_map is None else label_map
     patient_level_datasets = {}
     
-    for label in (datasets.keys()):
-        adata = datasets[label]
-        print(f"Rolling up '{label}'...")
-        
-        # Convert the sums and the subject names to a DataFrame
-        # .layers['sum'] gives raw counts
+    for name in datasets.keys():
+        adata = datasets[name]
+        print(f"Rolling up '{name}'...")
+
+        if not keep_unmapped:
+            keep = adata.obs[label_col].astype(str).isin(label_map.keys()).to_numpy()
+            if not keep.all():
+                dropped = adata.obs.loc[~keep, label_col].astype(str).value_counts().to_dict()
+                print(f"  Dropping rows with labels {dropped}")
+            adata = adata[keep]
+
+        # Mean expression per subject
+        # Use .X (standardized in preprocessing), not layers['mean'] (unscaled copy)
+        subjects = adata.obs_names.astype(str).to_numpy()
+        X = adata.X.toarray() if hasattr(adata.X, 'toarray') else adata.X
         df = pd.DataFrame(
-            adata.layers['mean'], 
-            index=adata.obs['subject'], 
+            X,
+            index=subjects,
             columns=adata.var_names
         )
+        meaned_df = df.groupby(level=0).mean()
         
-        # Group by subject and mean
-        meaned_df = df.groupby(level=0, observed=False).mean()
-        
-        # Create the new AnnData from the summed DataFrame
         patient_pseudo = ad.AnnData(X=meaned_df.values)
         patient_pseudo.obs_names = meaned_df.index.astype(str)
         patient_pseudo.var_names = meaned_df.columns.astype(str)
         
-        # Re-attach metadata (AD_status, etc.)
-        meta = adata.obs.groupby('subject', observed=False).agg({
-            'AD_status': 'first',
+        # Re-attach metadata
+        obs = adata.obs.reset_index(drop=True).assign(
+            subject=subjects,
+            **{label_col: adata.obs[label_col].astype(str).to_numpy()}
+        )
+        meta = obs.groupby('subject').agg({
+            label_col: 'first',
             'n_obs_aggregated': 'mean'
-        })
-        
-        # Align metadata with the new rows
-        patient_pseudo.obs['subject'] = patient_pseudo.obs_names
-        patient_pseudo.obs['n_obs_mean'] = meta.loc[patient_pseudo.obs_names, 'n_obs_aggregated']
-        patient_pseudo.obs["cell_type_high_resolution"] = label
-        patient_pseudo.obs['AD_status'] = meta.loc[patient_pseudo.obs_names, 'AD_status']
+        }).loc[patient_pseudo.obs_names]
 
-        # Convert to sparse matrix (Scanpy prefers this for memory)
+        patient_pseudo.obs['subject'] = patient_pseudo.obs_names
+        patient_pseudo.obs['n_obs_mean'] = meta['n_obs_aggregated'].to_numpy()
+        patient_pseudo.obs[label_col] = pd.Categorical(meta[label_col].to_numpy())
+        patient_pseudo.obs['AD_status'] = meta[label_col].map(label_map).to_numpy(dtype=np.float32)
+
         patient_pseudo.X = csr_matrix(patient_pseudo.X)
-        
-        patient_level_datasets[label] = patient_pseudo
+        patient_level_datasets[name] = patient_pseudo
         
     return patient_level_datasets
 
@@ -497,7 +505,10 @@ def training_loop(model: BINN,
                   device, 
                   scheduler, 
                   epochs:int,
-                  patience=10) -> dict:
+                  save_path: Path,
+                  data_info: str,
+                  patience=10
+                  ) -> dict:
     """
     Performs the entire training & testing loop over the epochs
     """
@@ -533,7 +544,7 @@ def training_loop(model: BINN,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'test_acc': test_acc,
-            }, "best_model.pt")
+            }, save_path / f"best_model_{data_info}.pt")
 
             print(f"New best model saved! test_acc = {test_acc:.4f}")
 
@@ -548,17 +559,15 @@ def training_loop(model: BINN,
     
     return history
 
-def load_model(model:BINN):
+def load_model(model:BINN, save_path: Path, data_info:str):
     """
     Loads previously found best model
     """
-    checkpoint = torch.load("best_model.pt")
-
+    device = next(model.parameters()).device
+    checkpoint = torch.load(save_path / f"best_model_{data_info}.pt", map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
 
-    print("Loaded best model with testing accuracy:",
-        checkpoint['test_acc'])
-    
+    print(f"Loaded best model from epoch {checkpoint['epoch']} with testing accuracy: {checkpoint['test_acc']:.4f}")
     return model
         
 
@@ -788,7 +797,7 @@ def hyperparameter_tuning_optuna(adata,
 
     return study.best_params
 
-def save_test_results(model, test_loader, device) -> pd.DataFrame:
+def save_test_results(model, test_loader, device, input_info, save_path: Path) -> pd.DataFrame:
     """
     Saves the testing results for visualization
     """
@@ -812,11 +821,12 @@ def save_test_results(model, test_loader, device) -> pd.DataFrame:
     df_res = pd.DataFrame({'y_true': all_labels, 'y_prob': all_probs})
     
     now = dt.now().strftime("%y%m%d_%H%M")
-    df_res.to_csv(pp.binn_test_results_path / f'binn_test_results_{now}.csv', index=False)
-    print("Saved: binn_test_results.csv")
+    f = f'binn_test_results_{input_info}_{now}.csv'
+    df_res.to_csv(save_path / f, index=False)
+    print(f"Saved: {f}")
     return df_res
 
-def confusion_matrix_binn(df_res: pd.DataFrame) -> None:
+def confusion_matrix_binn(df_res: pd.DataFrame, save_path: Path, data_info: str) -> None:
     """
     Confusion matrix plotting function for BINN 
     """
@@ -832,7 +842,7 @@ def confusion_matrix_binn(df_res: pd.DataFrame) -> None:
     cmd.plot(cmap=cmap)
 
     plt.title("Confusion Matrix (BINN)")
-    plt.savefig('confusion_matrix_BINN.png')
+    plt.savefig(save_path / f'confusion_matrix_BINN_{data_info}.png')
     plt.show()
     plt.close()
 

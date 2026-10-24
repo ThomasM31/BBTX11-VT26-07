@@ -73,7 +73,7 @@ class PipelinePaths:
         self.genes_keep_path      = data_path / processed_data / "filter_genes"
         self.hvg_lists_path       = data_path / processed_data / "hvg_lists"
         self.hvg_common_path      = data_path / processed_data / "hvg_common"
-        self.stratified_path      = data_path / processed_data / "stratified"
+        self.stratified_path      = data_path / processed_data / "stratified" 
         
         # to save umaps
         self.figures_path         = data_path / "figures"
@@ -103,6 +103,8 @@ class PipelinePaths:
         self.mask_path_danish    = self.mask_base / "danish"
         self.mask_hvg_non_pseudo = self.mask_base / "hvg_non_pseudo" / hvg_non_pseudo_run_vars
         self.mask_pseudo_non_hvg = self.mask_base / "pseudo_non_hvg" / pseudo_non_hvg_run_vars
+
+        self.stratified_full_pipe      = data_path / processed_data / "stratified" / "full_pipeline" / full_pipeline_run_vars
 
         self.extra_test_path = data_path / processed_data/ "test_path"
 

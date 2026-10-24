@@ -346,8 +346,7 @@ def main(
         INPUT_DIR: Path, 
         OUTPUT_DIR: Path, 
         CONNECTIVITY_FILE: Path, 
-        several_datasets: bool, 
-        mask_label: str, 
+        data_sources: list[Path], 
         n_layers: int
         ):
     print("=== STARTING FULL MASK GENERATION ===")
@@ -371,11 +370,18 @@ def main(
     # convert to lists of tuples
     pathway_pathway_mapping = list(pathway_pathway_mapping.itertuples(index=False, name=None))
     gene_pathway_mapping = list(gene_pathway_mapping.itertuples(index=False, name=None))
-
-    def _do_mask_creation(file: str, save_str: str, data_info: str) -> None:
+    
+    def remove_stale_files(file: str, data_info: str) -> None:
+        target_dir = OUTPUT_DIR / data_info
+        if not target_dir.exists():
+            return
         cell_name = file.removesuffix('.h5ad')
-        print(f">>> Processing: {cell_name}")
-        
+        old_files = list(target_dir.glob(f"{cell_name}_layer_*_mask.csv"))
+        for old_file in old_files:
+            old_file.unlink()
+        print(f"Removed {len(old_files)} old mask files for {cell_name} in {target_dir}")
+            
+    def _do_mask_creation(file: str, data_info: str) -> None:
         try:
             # Read AnnData
             f = INPUT_DIR / file
@@ -395,45 +401,33 @@ def main(
             # Generate matrixes
             matrices = pn.get_connectivity_matrices(n_layers=n_layers)
 
-            target_dir = OUTPUT_DIR / data_info
-            if (OUTPUT_DIR / data_info).exists():
-                for old_file in target_dir.glob("*.csv"):
-                    old_file.unlink()
-                print(f"Cleaned up existing .csv files in {target_dir}")
-            
             for i, m in enumerate(matrices):
-                save_name = save_str if save_str != '' else cell_name 
-                out_path = OUTPUT_DIR / data_info / f"{save_name}_layer_{i}_mask.csv"
+                cell_name = file.removesuffix('.h5ad')
+                out_path = OUTPUT_DIR / data_info / f"{cell_name}_layer_{i}_mask.csv"
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 m.to_csv(out_path)
                 print(f"Saved: (Shape: {m.shape}) to {out_path}")
                 
         except Exception as e:
-            print(f"      [ERROR] could not process {cell_name}: {e}")
-    
-    
-    # Find all cell types (.h5ad-files)
-    cell_files = [f for f in os.listdir(INPUT_DIR) if f.endswith('.h5ad')]
-    print(f"Found {len(cell_files)} cell types. \n")
+            print(f"      [ERROR] could not process {file}: {e}")
 
-    # get the directory name (has info on vars used to create processed files)
-    data_info = INPUT_DIR.parts[-1]
-    if several_datasets:
-        for file_name in cell_files:
-            _do_mask_creation(file_name, '', data_info)
-            print("\n=== ALL CELL TYPES PROCESSED ===")
-    else:
-        cell_files_stripped = [c.removesuffix('.h5ad') for c in cell_files]
-        save_str = "_".join(cell_files_stripped)
-        # we select which cell type to make the mask from (some may have fewer than n_top HVGs)
-        to_mask_from = f'{mask_label}.h5ad'
-        _do_mask_creation(to_mask_from, save_str, data_info)
+    data_info = INPUT_DIR.name
+    print(f'Run variables are: {data_info}')
+    for data_source in data_sources:
+        print(f'\nCreating Mask Matrices for {data_source}')
 
+        # removing all old masks for the cell type so that we do not have any missmatched layers
+        remove_stale_files(data_source, data_info)
+
+        # make masks
+        _do_mask_creation(data_source, data_info)
+
+    print(f'\nMASK CREATION COMPLETED FOR {len(data_sources)} FILES.')
     
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description = "Pre-process anndata objects and save as .h5ad"
+        description = "Create Mask Matrices from preprocessed AnnData objects."
     )
 
     parser.add_argument(
@@ -456,18 +450,9 @@ if __name__ == "__main__":
 
     # Optional argument
     parser.add_argument(
-        "--several_datasets", 
-        type=bool,
-        default=False,
-        help="If True prepares mask matrixes for all files in a folder (if gene set is different for files / cell types)"
-    )
-
-    # Optional argument
-    parser.add_argument(
-        "--mask_label", 
-        type=str,
-        default='exc3',
-        help="label for cell type to mask from"
+        "data_sources", 
+        type=list,
+        help="list of file paths to locations of preprocessed data"
     )
 
     parser.add_argument(
@@ -482,8 +467,8 @@ if __name__ == "__main__":
     filepath_in = args.filepath_in
     filepath_out = args.filepath_out
     connectivity_file = args.connectivity_file
+    data_sources = args.data_sources
     several_datasets = args.several_datasets
-    mask_label = args.mask_label
     n_layers = args.n_layers
 
-    main(filepath_in, filepath_out, connectivity_file, several_datasets, mask_label, n_layers)
+    main(filepath_in, filepath_out, connectivity_file, data_sources, n_layers)
