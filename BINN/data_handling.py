@@ -22,13 +22,6 @@ import scipy
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 
-# import module for consistent paths
-import importlib.util
-path = Path(__file__).resolve().parent.parent / "pipeline_paths_mnt.py"
-spec = importlib.util.spec_from_file_location("ppaths", path)
-ppaths = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ppaths)
-
 
 def data_concatenate(acollection : AnnCollection):
     """
