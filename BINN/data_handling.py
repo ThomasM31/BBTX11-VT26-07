@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime as dt
+import json
 
 # Own files
 sys.path.append(os.path.abspath("..")) # so we can import binn, binn_training
@@ -837,3 +838,13 @@ def class_report(df_res: pd.DataFrame) -> str:
     report =  classification_report(y_test, y_pred)
     print(f"Classification report for BINN: {report}")
     return report
+
+def save_hyperparameters(params: dict, save_path: Path):
+    with open(save_path, "w") as f:
+        json.dump(params, f, indent=4)
+
+def load_hyperparameters(load_path: Path, defaults: dict) -> dict:
+    if not load_path.exists():
+        return defaults
+    with open(load_path) as f:
+        return {**defaults, **json.load(f)}
