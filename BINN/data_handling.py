@@ -64,18 +64,27 @@ def transpose_datasets(datasets:dict) -> dict:
         
     return datasets_t
 
+def make_annloader(adata: ad.AnnData, batch_size: int, shuffle: bool) -> AnnLoader:
+    """
+    AnnLoader whose AD_status labels are turned into a numpy array before AnnLoader's default
+    torch converter runs. torch.tensor() on a pd.Series with a string index (e.g. patient IDs)
+    fails on pandas >= 3, since positional Series indexing was removed.
+    """
+    convert = {"obs": {"AD_status": lambda s: np.asarray(s, dtype=np.float32)}}
+    return AnnLoader(adata, batch_size=batch_size, shuffle=shuffle, convert=convert)
+
 def create_dataloaders(train_adata: ad.AnnData,
                        test_adata: ad.AnnData,
                        batch_size: int) -> tuple[AnnLoader, AnnLoader]:
     """
     Create dataloaders using built in loader for AnnData
     """
-    train_loader = AnnLoader(train_adata, batch_size=batch_size, shuffle=True)
-    test_loader = AnnLoader(test_adata, batch_size=batch_size, shuffle=False)
+    train_loader = make_annloader(train_adata, batch_size=batch_size, shuffle=True)
+    test_loader = make_annloader(test_adata, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
 
 def create_generalizability_dataloader(adata: ad.AnnData, batch_size: int) -> AnnLoader:
-    data_loader = AnnLoader(adata, batch_size=batch_size, shuffle=False)
+    data_loader = make_annloader(adata, batch_size=batch_size, shuffle=False)
     return data_loader
 
 def save_data(datasets: dict, filepath: str) -> None:
@@ -705,8 +714,8 @@ def run_cross_validation(adata,
         val_sub = adata[val_idx].copy()
         
         # Initialize fresh loaders
-        train_loader = AnnLoader(train_sub, batch_size=batch_size, shuffle=True)
-        val_loader = AnnLoader(val_sub, batch_size=batch_size, shuffle=False)
+        train_loader = make_annloader(train_sub, batch_size=batch_size, shuffle=True)
+        val_loader = make_annloader(val_sub, batch_size=batch_size, shuffle=False)
         
         # RE-INITIALIZE MODEL for each fold
         binn, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, 
