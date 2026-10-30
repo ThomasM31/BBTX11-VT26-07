@@ -5,6 +5,7 @@
 *.pyc
 .vscode
 .venv/
+venv/
 preprocessing/test.py
 
 # folder to simulate file structure

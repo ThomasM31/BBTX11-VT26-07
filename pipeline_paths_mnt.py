@@ -31,7 +31,7 @@ class PipelinePaths:
         # Get root and target folder
         if dir_mode == "shared" or dir_mode == "dev":
             root_dir = get_project_root()
-            dsk_folder = root_dir / "12tb_dsk3"
+            dsk_folder = root_dir
 
         if dir_mode == "shared":
             # To read from and write to the shared folder (on mnt)
@@ -88,7 +88,7 @@ class PipelinePaths:
         self.test_data_path       = data_path / processed_data / "test_data"
         
         # reactome assets
-        self.pathway_data_path    = base_path / "PathwayData"
+        self.pathway_data_path    = data_path / "PathwayData"
         
         # for saving fully preprocessed data
         self.compl_base = data_path / processed_data / "completed"
