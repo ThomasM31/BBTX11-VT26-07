@@ -1,7 +1,6 @@
 import os
 import sys
 from pathlib import Path
-from datetime import datetime as dt
 import json
 
 # Own files
@@ -496,6 +495,7 @@ def training_loop(model: BINN,
                   epochs:int,
                   save_path: Path,
                   data_info: str,
+                  time: str,
                   patience=10
                   ) -> dict:
     """
@@ -533,7 +533,7 @@ def training_loop(model: BINN,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'test_acc': test_acc,
-            }, save_path / f"best_model_{data_info}.pt")
+            }, save_path / f"{time}_best_model_{data_info}.pt")
 
             print(f"New best model saved! test_acc = {test_acc:.4f}")
 
@@ -548,12 +548,12 @@ def training_loop(model: BINN,
     
     return history
 
-def load_model(model:BINN, save_path: Path, data_info:str):
+def load_model(model:BINN, save_path: Path, data_info:str, time:str):
     """
     Loads previously found best model
     """
     device = next(model.parameters()).device
-    checkpoint = torch.load(save_path / f"best_model_{data_info}.pt", map_location=device)
+    checkpoint = torch.load(save_path / f"{time}_best_model_{data_info}.pt", map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
 
     print(f"Loaded best model from epoch {checkpoint['epoch']} with testing accuracy: {checkpoint['test_acc']:.4f}")
@@ -786,7 +786,7 @@ def hyperparameter_tuning_optuna(adata,
 
     return study.best_params
 
-def save_test_results(model, test_loader, device, input_info, save_path: Path) -> pd.DataFrame:
+def save_test_results(model, test_loader, device, input_info, save_path: Path, time: str) -> pd.DataFrame:
     """
     Saves the testing results for visualization
     """
@@ -809,13 +809,12 @@ def save_test_results(model, test_loader, device, input_info, save_path: Path) -
 
     df_res = pd.DataFrame({'y_true': all_labels, 'y_prob': all_probs})
     
-    now = dt.now().strftime("%y%m%d_%H%M")
-    f = f'binn_test_results_{input_info}_{now}.csv'
+    f = f'{time}_binn_test_results_{input_info}.csv'
     df_res.to_csv(save_path / f, index=False)
     print(f"Saved: {f}")
     return df_res
 
-def confusion_matrix_binn(df_res: pd.DataFrame, save_path: Path, data_info: str) -> None:
+def confusion_matrix_binn(df_res: pd.DataFrame, save_path: Path, data_info: str, time:str) -> None:
     """
     Confusion matrix plotting function for BINN 
     """
@@ -831,7 +830,7 @@ def confusion_matrix_binn(df_res: pd.DataFrame, save_path: Path, data_info: str)
     cmd.plot(cmap=cmap)
 
     plt.title("Confusion Matrix (BINN)")
-    plt.savefig(save_path / f'confusion_matrix_BINN_{data_info}.png')
+    plt.savefig(save_path / f'{time}_confusion_matrix_BINN_{data_info}.png')
     plt.show()
     plt.close()
 

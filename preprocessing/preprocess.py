@@ -310,7 +310,7 @@ def sum_gene_expr_counts(
 def filter_genes_by_min_expression(
     adata: ad.AnnData,  
     min_cells: int
-    ) -> None:
+    ) -> ad.AnnData:
     print(f"Filtering genes expressed in <{min_cells} cells...")
     old_gene_count = adata.n_vars
     sc.pp.filter_genes(adata, min_cells=min_cells, inplace=True)
@@ -442,10 +442,9 @@ def select_hvgs(adata: ad.AnnData, n_top_genes: int):
     adata_hvgs = sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, flavor='seurat_v3', inplace=False)
     return adata_hvgs.index[adata_hvgs['highly_variable']]
 
-def filter_hvgs(dataset: ad.AnnData, hvgs:pd.Series):
-
+def filter_from_genes(dataset: ad.AnnData, genes:pd.Series):
     old = dataset.n_vars
-    dataset = dataset[:, hvgs]
+    dataset = dataset[:, genes]
     print(f'Nr genes in dataset {old} -> {dataset.n_vars}')
     return dataset
 
