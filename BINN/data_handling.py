@@ -468,7 +468,9 @@ def create_model(in_features:int,
                  lr:float, 
                  weight_decay:float,
                  dropout:float,
-                 activation_fn=nn.LeakyReLU(0.1)):
+                 activation_fn=nn.LeakyReLU(0.1),
+                 epochs:int = 400
+                 ):
     """
     Instantiate BINN and accompanying criterion, optimizer and scheduler
     """
@@ -481,7 +483,8 @@ def create_model(in_features:int,
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=75, eta_min=1e-6)
+    # set T_max to nr of epochs to give a single smooth decay instead of cycling
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
 
     return model, criterion, optimizer, scheduler
 
@@ -545,6 +548,40 @@ def training_loop(model: BINN,
             print("Early stopping triggered!")
             history.update({"best_test_acc": best_test_acc})
             break
+    
+    return history
+
+def train_fixed_epochs(model, 
+                       train_loader, 
+                       criterion, 
+                       optimizer, 
+                       scheduler, 
+                       device,
+                       n_epochs: int, 
+                       save_path: Path, 
+                       data_info: str, 
+                       time: str,
+                       monitor_loader=None
+                       ) -> dict:
+    """Train for exactly n_epochs. monitor_loader is logged only, never used for decisions."""
+    
+    history = {'train_loss': [], 'train_acc': [], 'test_loss': [], 'test_acc': []}
+    
+    for _ in range(n_epochs):
+        tl, ta = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
+        scheduler.step()
+        history['train_loss'].append(tl)
+        history['train_acc'].append(ta)
+        
+        if monitor_loader is not None:
+            ml, ma = bt.test_one_epoch(model, monitor_loader, criterion, device)
+            history['test_loss'].append(ml)
+            history['test_acc'].append(ma)
+    
+    torch.save(
+        {'epoch': n_epochs - 1, 
+         'model_state_dict': model.state_dict()},
+          save_path / f"{time}_final_model_{data_info}.pt")
     
     return history
 
@@ -694,7 +731,7 @@ def run_cross_validation(adata,
     Args:
         adata(ad.Anndata): global concatenated anndata
         k(int): number of cross-val splits
-        epochs(int): 
+        epochs(int):
 
     Returns:
         AUC scores for each fold
@@ -719,7 +756,7 @@ def run_cross_validation(adata,
         
         # RE-INITIALIZE MODEL for each fold
         binn, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, 
-                                                        lr=lr, weight_decay=weight_decay, dropout=dropout, activation_fn=activation_fn)
+        lr=lr, weight_decay=weight_decay, dropout=dropout, epochs=epochs, activation_fn=activation_fn)
         
         best_fold_auc = 0
         
@@ -743,6 +780,78 @@ def run_cross_validation(adata,
     print(f"Mean ROC-AUC: {np.mean(fold_aucs):.4f} +/- {np.std(fold_aucs):.4f}")
     print("="*30)
     return fold_aucs
+
+def run_cross_validation_mean_curve(
+        adata, 
+        in_features:int, 
+        layers_list:list, 
+        tensor_masks:list, 
+        device, 
+        lr=4e-3,
+        weight_decay=0.123,
+        batch_size=32,
+        dropout=0.5,
+        activation_fn=nn.Tanh(),
+        k=5, 
+        epochs=150) -> tuple[np.ndarray, int]:
+    """
+    Cross validate BINN
+    Args:
+        adata(ad.Anndata): global concatenated anndata
+        k(int): number of cross-val splits
+        epochs(int): 
+
+    Returns:
+        Per fold AUCs at a shared epoch, and the epoch (1-indexed, number of epochs to train)
+    """
+    # Prepare indices and labels
+    X_indices = np.arange(adata.n_obs)
+    y_labels = adata.obs['AD_status'].values.astype(float)
+    
+    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+    curves = np.zeros((k, epochs))
+
+    for fold, (train_idx, val_idx) in enumerate(skf.split(X_indices, y_labels)):
+        print(f"\n--- Starting Fold {fold+1}/{k} ---")
+        
+        # Create subsets
+        train_sub = adata[train_idx].copy()
+        val_sub = adata[val_idx].copy()
+        
+        # Initialize fresh loaders
+        train_loader = make_annloader(train_sub, batch_size=batch_size, shuffle=True)
+        val_loader = make_annloader(val_sub, batch_size=batch_size, shuffle=False)
+        
+        # RE-INITIALIZE MODEL for each fold
+        binn, criterion, optimizer, scheduler = create_model(
+            in_features, 
+            layers_list, 
+            tensor_masks, 
+            device, 
+            lr=lr, 
+            weight_decay=weight_decay, 
+            dropout=dropout, 
+            epochs=epochs,
+            activation_fn=activation_fn
+            )
+        
+        # Training Loop for this fold
+        for epoch in range(epochs):
+            train_loss, train_acc = bt.train_one_epoch(binn, train_loader, criterion, optimizer, device)
+            scheduler.step()
+            #test_loss, test_acc = bt.test_one_epoch(binn, val_loader, criterion, device)
+
+            # Evaluate AUC at end of epoch
+            probs, targets, auc_score = evaluate_model_roc(binn, val_loader, device)
+            curves[fold, epoch] = auc_score
+            
+    mean_curve = curves.mean(axis=0)
+    best_epoch = int(mean_curve.argmax())
+
+    # TODO pretty print results here
+
+    return curves[:, best_epoch], best_epoch + 1 # per-fold AUC at one shared epoch
+
 
 def hyperparameter_tuning_optuna(adata, 
                                 in_features:int, 
@@ -813,6 +922,63 @@ def save_test_results(model, test_loader, device, input_info, save_path: Path, t
     df_res.to_csv(save_path / f, index=False)
     print(f"Saved: {f}")
     return df_res
+
+
+def hyperparameter_tuning_optuna_mean_curve(adata, 
+                                in_features:int, 
+                                layers_list:list, 
+                                tensor_masks:list, 
+                                device, 
+                                batch_size=32,
+                                activation_fn=nn.Tanh(),
+                                k=5, 
+                                epochs=150) -> dict:
+    """
+    Hyperparameter tune the BINN model in regard to learning rate and weight decay
+    """
+    def objective(trial) -> float:
+        # Let Optuna suggest the hyperparameters for this run
+        lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
+        weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-1, log=True)
+        dropout = trial.suggest_float("dropout", 0.1, 0.5, log=True)
+        
+        # Run mean curve CV function
+        fold_aucs, best_epoch = run_cross_validation_mean_curve(
+            adata, 
+            in_features, 
+            layers_list, 
+            tensor_masks, 
+            device, 
+            lr=lr, 
+            weight_decay=weight_decay, 
+            batch_size=batch_size, 
+            dropout=dropout,
+            activation_fn=activation_fn,
+            k=k, 
+            epochs=epochs
+            )
+        
+        trial.set_user_attr("best_epoch", best_epoch)
+        return float(np.mean(fold_aucs))
+
+    # Create the study and optimize!
+    print("Starting Optuna Hyperparameter Search...")
+    study = optuna.create_study(direction="maximize")
+
+    # Run 30 trials (takes time, but worth it)
+    study.optimize(objective, n_trials=30)
+
+    best = study.best_trial
+
+    # View the results
+    print("\n=== Best Hyperparameters ===")
+    print(study.best_params)
+    print(f"Best ROC-AUC: {study.best_value:.4f} found at epoch {best}")
+
+    return {**best.params, 
+            "epochs":best.user_attrs["best_epoch"],
+            "tune_total_epochs": epochs,
+            "cv_auc": best.value}
 
 def confusion_matrix_binn(df_res: pd.DataFrame, save_path: Path, data_info: str, time:str) -> None:
     """
