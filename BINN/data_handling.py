@@ -706,9 +706,7 @@ def run_cross_validation(adata,
     skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
     fold_aucs = []
 
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X_indices, y_labels)):
-        print(f"\n--- Starting Fold {fold+1}/{k} ---")
-        
+    for fold, (train_idx, val_idx) in enumerate(skf.split(X_indices, y_labels)):     
         # Create subsets
         train_sub = adata[train_idx].copy()
         val_sub = adata[val_idx].copy()
