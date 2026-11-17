@@ -8,17 +8,17 @@ sys.path.append(os.path.abspath("..")) # so we can import binn, binn_training
 from binn import BINN
 import binn_training as bt
 
+
 import optuna
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
 from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, classification_report
-import sklearn.metrics
 import pandas as pd, numpy as np
 from scipy.sparse import csr_matrix
 import torch.nn as nn
 import torch
 import scanpy as sc
-from sklearn.model_selection import StratifiedKFold, GridSearchCV, cross_validate
+from sklearn.model_selection import StratifiedKFold
 import scipy
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
