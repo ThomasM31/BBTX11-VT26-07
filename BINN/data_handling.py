@@ -610,7 +610,7 @@ def train_fixed_epochs(model,
     
     history = {'train_loss': [], 'train_acc': [], 'test_loss': [], 'test_acc': []}
     
-    for _ in range(n_epochs):
+    for epoch in range(n_epochs):
         tl, ta = bt.train_one_epoch(model, train_loader, criterion, optimizer, device)
         scheduler.step()
         history['train_loss'].append(tl)
@@ -853,18 +853,16 @@ def run_CV_nested(
     tensor_masks: list,
     device,
     eval_metric: str,
-    lr: float = 4e-3,
-    weight_decay: float = 0.123,
     batch_size: int = 32,
-    dropout: float = 0.5,
     activation_fn=nn.Tanh(),
     k_outer: int = 5,
     k_inner: int = 5,
     epochs: int = 150,
+    n_trials: int = 30,
     save_path=None, 
     data_info='', 
     time=''
-    ) -> tuple[np.ndarray, int]:
+    ) -> tuple[np.ndarray, list[dict]]:
 
     metric = get_metric(eval_metric)
 
@@ -879,7 +877,7 @@ def run_CV_nested(
         best = hyperparameter_tuning_optuna(
             outer_train, in_features, layers_list, tensor_masks, device, 
             metric=metric, batch_size=batch_size, activation_fn=activation_fn,
-            k=k_inner, epochs=epochs, n_trials=10
+            k=k_inner, epochs=epochs, n_trials=n_trials
         )
 
         # refit a fresh model on all of outer train
