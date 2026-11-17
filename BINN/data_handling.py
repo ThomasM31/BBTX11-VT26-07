@@ -12,16 +12,59 @@ import optuna
 import anndata as ad
 from anndata.experimental import AnnCollection, AnnLoader
 from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, classification_report
+import sklearn.metrics
 import pandas as pd, numpy as np
 from scipy.sparse import csr_matrix
 import torch.nn as nn
 import torch
 import scanpy as sc
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, GridSearchCV, cross_validate
 import scipy
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 
+from dataclasses import dataclass
+from typing import Callable, Union
+from sklearn.metrics import (roc_auc_score, average_precision_score, accuracy_score,
+                             balanced_accuracy_score, f1_score, matthews_corrcoef,
+                             log_loss, brier_score_loss)
+
+@dataclass(frozen=True)
+class Metric:
+    name: str
+    fn: Callable                    # fn(y_true, y_input) -> float
+    uses_proba: bool                # True: probabilities, False: 0/1 predictions
+    greater_is_better: bool = True
+    threshold: float = 0.5          # only used when uses_proba=False
+
+    def __call__(self, y_true, probs) -> float:
+        y_in = probs if self.uses_proba else (probs >= self.threshold).astype(int)
+        return float(self.fn(y_true, y_in))
+
+    @property
+    def direction(self) -> str:     # for optuna.create_study
+        return "maximize" if self.greater_is_better else "minimize"
+
+    def best_index(self, curve) -> int:   # for picking the epoch
+        return int(np.argmax(curve) if self.greater_is_better else np.argmin(curve))
+
+METRICS = {
+    "roc_auc":           Metric("roc_auc", roc_auc_score, uses_proba=True),
+    "average_precision": Metric("average_precision", average_precision_score, uses_proba=True),
+    "log_loss":          Metric("log_loss", log_loss, uses_proba=True, greater_is_better=False),
+    "brier":             Metric("brier", brier_score_loss, uses_proba=True, greater_is_better=False),
+    "accuracy":          Metric("accuracy", accuracy_score, uses_proba=False),
+    "balanced_accuracy": Metric("balanced_accuracy", balanced_accuracy_score, uses_proba=False),
+    "f1":                Metric("f1", f1_score, uses_proba=False),
+    "mcc":               Metric("mcc", matthews_corrcoef, uses_proba=False),
+}
+
+def get_metric(metric: Union[str, Metric]) -> Metric:
+    if isinstance(metric, Metric):
+        return metric
+    if metric not in METRICS:
+        raise ValueError(f"Unknown metric '{metric}'. Options: {list(METRICS)}")
+    return METRICS[metric]
 
 def data_concatenate(acollection : AnnCollection):
     """
@@ -714,79 +757,14 @@ def fetch_best_metrics(history:list) -> dict:
     
     return best_metrics
 
-def run_cross_validation(adata, 
-                        in_features:int, 
-                        layers_list:list, 
-                        tensor_masks:list, 
-                        device, 
-                        lr=4e-3,
-                        weight_decay=0.123,
-                        batch_size=32,
-                        dropout=0.5,
-                        activation_fn=nn.Tanh(),
-                        k=5, 
-                        epochs=150) -> list:
-    """
-    Cross validate BINN
-    Args:
-        adata(ad.Anndata): global concatenated anndata
-        k(int): number of cross-val splits
-        epochs(int):
 
-    Returns:
-        AUC scores for each fold
-    """
-    # Prepare indices and labels
-    X_indices = np.arange(adata.n_obs)
-    y_labels = adata.obs['AD_status'].values.astype(float)
-    
-    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
-    fold_aucs = []
-
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X_indices, y_labels)):
-        print(f"\n--- Starting Fold {fold+1}/{k} ---")
-        
-        # Create subsets
-        train_sub = adata[train_idx].copy()
-        val_sub = adata[val_idx].copy()
-        
-        # Initialize fresh loaders
-        train_loader = make_annloader(train_sub, batch_size=batch_size, shuffle=True)
-        val_loader = make_annloader(val_sub, batch_size=batch_size, shuffle=False)
-        
-        # RE-INITIALIZE MODEL for each fold
-        binn, criterion, optimizer, scheduler = create_model(in_features, layers_list, tensor_masks, device, 
-        lr=lr, weight_decay=weight_decay, dropout=dropout, epochs=epochs, activation_fn=activation_fn)
-        
-        best_fold_auc = 0
-        
-        # Training Loop for this fold
-        for epoch in range(epochs):
-            train_loss, train_acc = bt.train_one_epoch(binn, train_loader, criterion, optimizer, device)
-            #test_loss, test_acc = bt.test_one_epoch(binn, val_loader, criterion, device)
-
-            # Evaluate AUC at end of epoch
-            probs, targets, auc_score = evaluate_model_roc(binn, val_loader, device)
-            current_auc = roc_auc_score(targets, probs)
-            
-            if current_auc > best_fold_auc:
-                best_fold_auc = current_auc
-        
-        print(f"Fold {fold+1} Best Test AUC: {best_fold_auc:.4f}")
-        fold_aucs.append(best_fold_auc)
-
-    # Final Results
-    print("\n" + "="*30)
-    print(f"Mean ROC-AUC: {np.mean(fold_aucs):.4f} +/- {np.std(fold_aucs):.4f}")
-    print("="*30)
-    return fold_aucs
-
-def run_cross_validation_mean_curve(
+def run_cross_validation(
         adata, 
         in_features:int, 
         layers_list:list, 
         tensor_masks:list, 
         device, 
+        metric: Metric,
         lr=4e-3,
         weight_decay=0.123,
         batch_size=32,
@@ -811,9 +789,7 @@ def run_cross_validation_mean_curve(
     skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
     curves = np.zeros((k, epochs))
 
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X_indices, y_labels)):
-        print(f"\n--- Starting Fold {fold+1}/{k} ---")
-        
+    for fold, (train_idx, val_idx) in enumerate(skf.split(X_indices, y_labels)):      
         # Create subsets
         train_sub = adata[train_idx].copy()
         val_sub = adata[val_idx].copy()
@@ -837,63 +813,148 @@ def run_cross_validation_mean_curve(
         
         # Training Loop for this fold
         for epoch in range(epochs):
-            train_loss, train_acc = bt.train_one_epoch(binn, train_loader, criterion, optimizer, device)
+            bt.train_one_epoch(binn, train_loader, criterion, optimizer, device)
             scheduler.step()
-            #test_loss, test_acc = bt.test_one_epoch(binn, val_loader, criterion, device)
-
-            # Evaluate AUC at end of epoch
-            probs, targets, auc_score = evaluate_model_roc(binn, val_loader, device)
-            curves[fold, epoch] = auc_score
+            curves[fold, epoch] = evaluate_model(binn, val_loader, device, metric)[2]
             
-    mean_curve = curves.mean(axis=0)
-    best_epoch = int(mean_curve.argmax())
+    best_epoch = metric.best_index(curves.mean(axis=0))
+    return curves[:, best_epoch], best_epoch + 1
 
-    # TODO pretty print results here
+def evaluate_model(model, test_loader, device, metric: Metric):
+    model.eval()
+    all_probs = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for batch in test_loader:
+            inputs = batch.X.float().to(device)
 
-    return curves[:, best_epoch], best_epoch + 1 # per-fold AUC at one shared epoch
+            if type(batch.obs["AD_status"]) is pd.Series:
+                labels = torch.tensor(batch.obs['AD_status'].values.astype(float)).float().reshape(-1, 1).to(device)
+            else:
+                labels = batch.obs['AD_status'].detach().clone().float().reshape(-1, 1).to(device)
+            
+            logits = model(inputs)
+            # Apply sigmoid to get probabilities [0, 1]
+            probs = torch.sigmoid(logits)
+
+            all_labels.extend(labels.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
+            
+    # fetch probabilites and target labels
+    probs, targets = np.array(all_probs).flatten(), np.array(all_labels).flatten()
+
+    return probs, targets, metric(targets, probs)
+
+def run_CV_nested(
+    adata,
+    in_features: int,
+    layers_list: list,
+    tensor_masks: list,
+    device,
+    eval_metric: str,
+    lr: float = 4e-3,
+    weight_decay: float = 0.123,
+    batch_size: int = 32,
+    dropout: float = 0.5,
+    activation_fn=nn.Tanh(),
+    k_outer: int = 5,
+    k_inner: int = 5,
+    epochs: int = 150,
+    save_path=None, 
+    data_info='', 
+    time=''
+    ) -> tuple[np.ndarray, int]:
+
+    metric = get_metric(eval_metric)
+
+    y = adata.obs['AD_status'].values.astype(float)
+    outer = StratifiedKFold(n_splits=k_outer, shuffle=True, random_state=0)
+    outer_score, chosen = [], []
+
+    for fold, (tr, va) in enumerate(outer.split(np.zeros(len(y)), y)):
+        outer_train, outer_val, = adata[tr].copy(), adata[va].copy()
+
+        # INNER: tune hyperparams + epoch on outer_train only
+        best = hyperparameter_tuning_optuna(
+            outer_train, in_features, layers_list, tensor_masks, device, 
+            metric=metric, batch_size=batch_size, activation_fn=activation_fn,
+            k=k_inner, epochs=epochs, n_trials=10
+        )
+
+        # refit a fresh model on all of outer train
+        model, crit, opt, sched = create_model(
+            in_features, layers_list, tensor_masks, device,
+            lr=best['lr'], weight_decay=best['weight_decay'],
+            dropout=best['dropout'], activation_fn=activation_fn,
+            epochs=best['tune_total_epochs']
+        )
+
+        train_fixed_epochs(
+            model, 
+            make_annloader(outer_train, batch_size, shuffle=True),
+            crit, opt, sched, device, n_epochs=best['epochs'],
+            save_path=save_path, data_info=f'{data_info}_outer{fold}', time=time)
+
+        # evaluate once on the untouched outer fold
+        _, _, score = evaluate_model(
+            model, 
+            make_annloader(outer_val, batch_size, shuffle=False), 
+            device, metric=metric)
+        
+        outer_score.append(score)
+        chosen.append(best)
+        print(f'Outer fold {fold+1}: score {eval_metric} = {score:.4f}, params={best}')
+
+    print(f"Nested CV Score ({eval_metric}): {np.mean(outer_score):.4f} +/- {np.std(outer_score):.4f}")
+    return np.array(outer_score), chosen
 
 
 def hyperparameter_tuning_optuna(adata, 
                                 in_features:int, 
                                 layers_list:list, 
-                                tensor_masks:list, 
-                                device, 
+                                tensor_masks:list,
+                                device,
+                                metric: Union[str, Metric] = "roc_auc",
                                 batch_size=32,
                                 activation_fn=nn.Tanh(),
                                 k=5, 
-                                epochs=150) -> dict:
+                                epochs=150,
+                                n_trials=30) -> dict:
     """
     Hyperparameter tune the BINN model in regard to learning rate and weight decay
     """
+    metric = get_metric(metric)
+
     def objective(trial) -> float:
-        # Let Optuna suggest the hyperparameters for this run
-        lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
-        weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-1, log=True)
-        dropout = trial.suggest_float("dropout", 0.1, 0.5, log=True)
-        
-        # Run your existing CV function, passing the suggested params
-        fold_aucs = run_cross_validation(adata, in_features, layers_list, tensor_masks, 
-                                            device, k=k, epochs=epochs, lr=lr, weight_decay=weight_decay, 
-                                            batch_size=batch_size, dropout=dropout, activation_fn=activation_fn)
-        
-        mean_auc = np.mean(fold_aucs)
-        
-        # Optuna will try to MAXIMIZE this returned value
-        return mean_auc
+        hp = dict(
+            lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True),
+            weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-1, log=True),
+            dropout = trial.suggest_float("dropout", 0.1, 0.5, log=True)
+        )
+
+        fold_scores, best_epoch = run_cross_validation(
+            adata, in_features, layers_list, tensor_masks, device, metric=metric,
+            batch_size=batch_size, activation_fn=activation_fn, k=k, epochs=epochs, **hp
+        )
+
+        trial.set_user_attr("best_epoch", best_epoch)
+        return float(np.mean(fold_scores))
 
     # Create the study and optimize!
     print("Starting Optuna Hyperparameter Search...")
-    study = optuna.create_study(direction="maximize")
+    study = optuna.create_study(direction=metric.direction)
 
-    # Run 30 trials (takes time, but worth it)
-    study.optimize(objective, n_trials=30)
+    study.optimize(objective, n_trials=n_trials)
+    best = study.best_trial
 
-    # View the results
-    print("\n=== Best Hyperparameters ===")
-    print(study.best_params)
-    print(f"Best Mean CV ROC-AUC: {study.best_value:.4f}")
-
-    return study.best_params
+    print(f"Best {metric.name}: {best.value:.4f} at epoch {best.user_attrs['best_epoch']}, "
+          f"params={best.params}")
+    return {**best.params,
+            "epochs": best.user_attrs["best_epoch"],
+            "tune_total_epochs": epochs,
+            "metric": metric.name,
+            "cv_score": best.value}
 
 def save_test_results(model, test_loader, device, input_info, save_path: Path, time: str) -> pd.DataFrame:
     """
