@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg') # Use non-interactive backend for Linux servers
+#matplotlib.use('Agg') # Use non-interactive backend for Linux servers
 
 import os
 import numpy as np
